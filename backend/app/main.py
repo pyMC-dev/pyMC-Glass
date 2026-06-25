@@ -5,9 +5,9 @@ from fastapi import FastAPI
 
 from app.api.routes.adoption import router as adoption_router
 from app.api.routes.alert_actions import router as alert_actions_router
-from app.api.routes.alerts import router as alerts_router
 from app.api.routes.alert_policy import groups_router as node_groups_router
 from app.api.routes.alert_policy import router as alert_policy_router
+from app.api.routes.alerts import router as alerts_router
 from app.api.routes.audit import router as audit_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.bootstrap import router as bootstrap_router
@@ -18,6 +18,7 @@ from app.api.routes.health import router as health_router
 from app.api.routes.inform import router as inform_router
 from app.api.routes.insights import router as insights_router
 from app.api.routes.packets import router as packets_router
+from app.api.routes.repeater_policy import router as repeater_policy_router
 from app.api.routes.repeaters import router as repeaters_router
 from app.api.routes.smoke import router as smoke_router
 from app.api.routes.system_settings import router as system_settings_router
@@ -27,8 +28,8 @@ from app.api.routes.users import router as users_router
 from app.config import get_settings
 from app.db.migrate import apply_migrations
 from app.db.session import get_engine, get_session_factory
-from app.services.alert_actions import get_notification_provider_registry
 from app.services.alert_action_dispatcher import AlertActionDispatcherService
+from app.services.alert_actions import get_notification_provider_registry
 from app.services.alert_policy_monitor import AlertPolicyMonitorService
 from app.services.bootstrap_seed import seed_default_admin_if_needed
 from app.services.mqtt_ingest import MqttIngestService
@@ -44,13 +45,20 @@ async def lifespan(_: FastAPI):
     session_factory = get_session_factory()
     seed_default_admin_if_needed(settings, session_factory)
     managed_mqtt_host = ""
+    managed_mqtt_additional_hosts: list[str] = []
     with session_factory() as db:
         managed_mqtt_settings, _, _ = get_effective_managed_mqtt_settings(db)
         managed_mqtt_host = str(managed_mqtt_settings.get("mqtt_broker_host", "")).strip()
+        managed_mqtt_additional_hosts = [
+            str(host).strip()
+            for host in managed_mqtt_settings.get("mqtt_broker_additional_hosts", [])
+            if str(host).strip()
+        ]
     pki_service = PkiService(settings)
     pki_service.ensure_ca()
     pki_service.ensure_mqtt_broker_server_certificate(
-        extra_san_hosts=[managed_mqtt_host] if managed_mqtt_host else None
+        extra_san_hosts=([managed_mqtt_host] if managed_mqtt_host else [])
+        + managed_mqtt_additional_hosts
     )
     pki_service.ensure_backend_mqtt_client_certificate()
     mqtt_ingest = MqttIngestService(
@@ -80,7 +88,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
         title=settings.app_name,
-        version = "1.0.4",
+        version="1.1.0",
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan,
@@ -104,6 +112,7 @@ def create_app() -> FastAPI:
     app.include_router(alert_policy_router, tags=["alert-policies"])
     app.include_router(node_groups_router, tags=["node-groups"])
     app.include_router(transport_keys_router, tags=["transport-keys"])
+    app.include_router(repeater_policy_router, tags=["repeater-policies"])
     app.include_router(audit_router, tags=["audit"])
     app.include_router(users_router, tags=["users"])
     app.include_router(smoke_router, tags=["smoke"])
@@ -128,4 +137,3 @@ def run() -> None:
 
 if __name__ == "__main__":
     run()
-

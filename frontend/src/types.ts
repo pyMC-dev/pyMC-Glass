@@ -58,6 +58,8 @@ export interface RepeaterResponse {
   firmware_version: string | null;
   location: string | null;
   config_hash: string | null;
+  inform_ip: string | null;
+  open_url: string | null;
   last_inform_at: string | null;
   created_at: string;
   updated_at: string;
@@ -75,6 +77,7 @@ export interface RepeaterUpdateRequest {
   status?: string;
   firmware_version?: string;
   location?: string;
+  open_url?: string | null;
   config_hash?: string;
 }
 
@@ -136,7 +139,9 @@ export type CommandAction =
   | "reboot"
   | "export_config"
   | "export_identity"
-  | "run_diagnostic";
+  | "run_diagnostic"
+  | "transport_keys_sync"
+  | "policy_sync";
 
 export const COMMAND_ACTIONS: CommandAction[] = [
   "restart_service",
@@ -151,6 +156,8 @@ export const COMMAND_ACTIONS: CommandAction[] = [
   "export_config",
   "export_identity",
   "run_diagnostic",
+  "transport_keys_sync",
+  "policy_sync",
 ];
 
 export interface QueueCommandRequest {
@@ -896,6 +903,7 @@ export interface ManagedMqttSettingsResponse {
   mqtt_broker_port: number;
   mqtt_base_topic: string;
   mqtt_tls_enabled: boolean;
+  mqtt_broker_additional_hosts: string[];
   source: string;
   updated_at: string | null;
 }
@@ -906,6 +914,7 @@ export interface ManagedMqttSettingsUpdateRequest {
   mqtt_broker_port: number;
   mqtt_base_topic: string;
   mqtt_tls_enabled: boolean;
+  mqtt_broker_additional_hosts?: string[];
   queue_to_repeaters?: boolean;
   reason?: string;
 }
@@ -936,4 +945,68 @@ export interface ConfigSnapshotEncryptionKeyGenerateRequest {
 export interface ConfigSnapshotEncryptionKeyGenerateResponse {
   settings: ConfigSnapshotEncryptionSettingsResponse;
   generated_entry: string;
+}
+
+export interface RepeaterPolicyTemplateResponse {
+  id: string;
+  name: string;
+  description: string | null;
+  enabled: boolean;
+  policy: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RepeaterPolicyTemplateCreateRequest {
+  name: string;
+  description?: string | null;
+  enabled: boolean;
+  policy: Record<string, unknown>;
+}
+
+export interface RepeaterPolicyTemplateUpdateRequest {
+  name?: string;
+  description?: string | null;
+  enabled?: boolean;
+  policy?: Record<string, unknown>;
+}
+
+export interface RepeaterPolicyValidateRequest {
+  policy: Record<string, unknown>;
+}
+
+export interface RepeaterPolicyValidateResponse {
+  valid: boolean;
+  errors: string[];
+  normalized_policy: Record<string, unknown> | null;
+}
+
+export interface RepeaterPolicySyncRequest {
+  template_id?: string;
+  policy?: Record<string, unknown>;
+  repeater_ids?: string[];
+  all_repeaters?: boolean;
+  mode?: "replace" | "patch";
+  validate_only?: boolean;
+  reason?: string;
+}
+
+export interface RepeaterPolicySyncStatusResponse {
+  repeater_id: string;
+  node_name: string;
+  template_id: string | null;
+  command_id: string | null;
+  payload_hash: string | null;
+  status: string;
+  error_message: string | null;
+  queued_at: string | null;
+  dispatched_at: string | null;
+  completed_at: string | null;
+  updated_at: string | null;
+}
+
+export interface RepeaterPolicySyncResponse {
+  queued_commands: number;
+  command_ids: string[];
+  statuses: RepeaterPolicySyncStatusResponse[];
 }

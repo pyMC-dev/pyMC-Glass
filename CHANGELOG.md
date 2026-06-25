@@ -1,5 +1,44 @@
 # Changelog
 All notable changes to this project are documented in this file.
+
+## [Unreleased]
+
+## [1.1.0] - 2026-06-24
+
+### Features
+
+- Added repeater UI launch buttons that open the repeater web interface from the repeater inform IP, falling back to the Glass connection host.
+- Added per-repeater Open Repeater URL overrides so Tailscale/VPN management URLs can be edited without changing the inform/control IP.
+- Added command queue checkbox targeting for selected repeaters, plus all-repeaters queueing from the command page.
+- Added example repeater policy templates for high airtime logging, low-signal dropping, and trusted pubkey allow-list patterns.
+- Added a single-repeater transport key sync action from the repeater detail page.
+- Added Glass-side Repeater Runtime Policy management with template storage, validation, visual editing, JSON editing, and policy_sync queueing.
+- Added Repeater policy object/group management in Glass, including channel hash groups, pubkey groups, and group-backed rule conditions.
+- Added Repeater policy sync status tracking so Glass records queued, dispatched, success, failed, and partial policy_sync results per repeater.
+- Added Repeater sensor telemetry rendering in Glass, including generic nested sensor metrics labeled as Sensor Readings.
+- Added Repeater-style UI polish for the theme toggle, light-mode sidebar contrast, and runtime policy tables.
+- Added Proxmox LXC installer/update helper support for Glass with Repeater-aligned prompt defaults.
+- Rebranded Glass UI and deployment assets to openHop.
+
+### Fixes
+
+- Fixed Open Repeater links to include the Repeater web UI port and avoid Docker bridge gateway IPs like 172.18.0.1 when building browser targets.
+- Switched the Network map base layer to the standard OpenStreetMap tile layer so map tiles render behind repeater markers.
+- Exposed repeater inform IP addresses through the API so Glass can link to repeater-local web interfaces.
+- Fixed policy editor behavior for HTTP IDs, Repeater-compatible condition fields, rule IDs, object/group references, and sync status formatting.
+- Fixed Proxmox installer prompt validation, non-interactive execution guards, update helper expansion, container startup diagnostics, and default resource sizing.
+- Preserved existing Glass database and Docker volumes across openHop deployment changes.
+
+### Documentation
+
+- Added Repeater policy_sync, sensor telemetry, openHop migration, and expanded project documentation.
+- Updated Repeater terminology and removed stale development wording.
+
+### Chores
+
+- Updated backend and frontend dependencies to current versions and cleared npm audit findings.
+- Cleaned up backend formatting/import ordering so ruff lint passes across app and tests.
+
 ## [1.0.4] - 2026-04-21
 
 ### Chores

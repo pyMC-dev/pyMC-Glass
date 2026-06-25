@@ -1,9 +1,9 @@
 from __future__ import annotations
+
 import asyncio
 import json
 import re
 from collections import Counter
-
 from datetime import UTC, datetime, timedelta
 from typing import Any, AsyncGenerator
 
@@ -26,6 +26,11 @@ from app.schemas.insights import (
     NeighborObservationListResponse,
     NeighborObservationResponse,
     NodeDetailResponse,
+    NodeObserverSnapshotResponse,
+    NodeTimeseriesPointResponse,
+    NodeTimeseriesResponse,
+    TopologyEdgeListResponse,
+    TopologyEdgeResponse,
     TopologyPacketGraphEdgeResponse,
     TopologyPacketGraphNodeResponse,
     TopologyPacketQualityResponse,
@@ -34,11 +39,6 @@ from app.schemas.insights import (
     TopologyRepeaterTrafficShareResponse,
     TopologySignalDistributionBinResponse,
     TopologySignalTrendPointResponse,
-    NodeObserverSnapshotResponse,
-    NodeTimeseriesPointResponse,
-    NodeTimeseriesResponse,
-    TopologyEdgeListResponse,
-    TopologyEdgeResponse,
     TopologySummaryResponse,
 )
 from app.security.deps import require_roles
@@ -175,6 +175,7 @@ def _build_filter_clauses(
             )
         )
     return clauses
+
 
 def _normalize_count_key(value: Any, *, unknown: str = "unknown") -> str:
     text = _to_optional_string(value)
@@ -331,8 +332,12 @@ def _extract_packet_hops(payload: dict[str, Any]) -> tuple[list[str], str | None
         if hops:
             return hops, "raw"
 
-    src_hash = _normalize_hop_token(payload.get("src_hash")) or _normalize_hop_token(nested_map.get("src_hash"))
-    dst_hash = _normalize_hop_token(payload.get("dst_hash")) or _normalize_hop_token(nested_map.get("dst_hash"))
+    src_hash = _normalize_hop_token(payload.get("src_hash")) or _normalize_hop_token(
+        nested_map.get("src_hash")
+    )
+    dst_hash = _normalize_hop_token(payload.get("dst_hash")) or _normalize_hop_token(
+        nested_map.get("dst_hash")
+    )
     if src_hash and dst_hash:
         return [src_hash, dst_hash], "derived"
     return [], None
@@ -349,6 +354,7 @@ def _extract_channel_detail(payload: dict[str, Any]) -> str | None:
         if value is not None:
             return f"{key}:{value}"
     return None
+
 
 @router.get("/neighbors/latest", response_model=NeighborObservationListResponse)
 def list_neighbor_observations(
@@ -457,7 +463,9 @@ def get_node_detail(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="pubkey is required",
         )
-    node = db.scalar(select(TopologyNode).where(func.lower(TopologyNode.pubkey) == normalized_pubkey))
+    node = db.scalar(
+        select(TopologyNode).where(func.lower(TopologyNode.pubkey) == normalized_pubkey)
+    )
     if node is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -564,8 +572,7 @@ def get_topology_summary(
 
     stale_nodes = int(
         db.scalar(
-            select(func.count())
-            .select_from(
+            select(func.count()).select_from(
                 select(TopologyObservation.observed_node_id)
                 .where(TopologyObservation.last_seen_at >= cutoff)
                 .group_by(TopologyObservation.observed_node_id)
@@ -632,6 +639,7 @@ def get_topology_summary(
         top_observer_node_name=top_observer_row[0] if top_observer_row is not None else None,
         top_observer_count=int(top_observer_row[1]) if top_observer_row is not None else None,
     )
+
 
 @router.get("/topology/packet-quality", response_model=TopologyPacketQualityResponse)
 def get_topology_packet_quality(
@@ -777,9 +785,10 @@ def get_topology_packet_structure(
 
         nested_payload = payload.get("payload")
         nested_map = nested_payload if isinstance(nested_payload, dict) else {}
-        has_raw = _to_optional_string(payload.get("raw")) is not None or _to_optional_string(
-            nested_map.get("raw")
-        ) is not None
+        has_raw = (
+            _to_optional_string(payload.get("raw")) is not None
+            or _to_optional_string(nested_map.get("raw")) is not None
+        )
         if has_raw:
             packets_with_raw += 1
 
@@ -940,7 +949,9 @@ def get_node_timeseries(
             detail="pubkey is required",
         )
 
-    node = db.scalar(select(TopologyNode).where(func.lower(TopologyNode.pubkey) == normalized_pubkey))
+    node = db.scalar(
+        select(TopologyNode).where(func.lower(TopologyNode.pubkey) == normalized_pubkey)
+    )
     if node is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

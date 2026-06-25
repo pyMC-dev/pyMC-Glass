@@ -77,7 +77,9 @@ def _name_is_used(
 def _load_group_or_404(db: Session, group_id: str) -> TransportKeyGroup:
     group = db.scalar(select(TransportKeyGroup).where(TransportKeyGroup.id == group_id))
     if group is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transport key group not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Transport key group not found"
+        )
     return group
 
 
@@ -131,9 +133,13 @@ def _descendant_group_ids(db: Session, group_id: str) -> set[str]:
 
 def _tree_nodes(db: Session) -> list[TransportKeyTreeNodeResponse]:
     groups = db.scalars(
-        select(TransportKeyGroup).order_by(TransportKeyGroup.sort_order.asc(), TransportKeyGroup.name.asc())
+        select(TransportKeyGroup).order_by(
+            TransportKeyGroup.sort_order.asc(), TransportKeyGroup.name.asc()
+        )
     ).all()
-    keys = db.scalars(select(TransportKey).order_by(TransportKey.sort_order.asc(), TransportKey.name.asc())).all()
+    keys = db.scalars(
+        select(TransportKey).order_by(TransportKey.sort_order.asc(), TransportKey.name.asc())
+    ).all()
     nodes: list[TransportKeyTreeNodeResponse] = []
     for group in groups:
         nodes.append(
@@ -236,12 +242,16 @@ def list_transport_key_groups(
     _: User = Depends(require_roles("admin", "operator", "viewer")),
 ) -> list[TransportKeyGroupResponse]:
     groups = db.scalars(
-        select(TransportKeyGroup).order_by(TransportKeyGroup.sort_order.asc(), TransportKeyGroup.name.asc())
+        select(TransportKeyGroup).order_by(
+            TransportKeyGroup.sort_order.asc(), TransportKeyGroup.name.asc()
+        )
     ).all()
     return [_to_group_response(group) for group in groups]
 
 
-@router.post("/groups", response_model=TransportKeyGroupResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/groups", response_model=TransportKeyGroupResponse, status_code=status.HTTP_201_CREATED
+)
 def create_transport_key_group(
     payload: TransportKeyGroupCreateRequest,
     db: Session = Depends(get_db_session),
@@ -249,7 +259,9 @@ def create_transport_key_group(
 ) -> TransportKeyGroupResponse:
     name = payload.name.strip()
     if _name_is_used(db, candidate=name):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Transport key/group name already exists")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Transport key/group name already exists"
+        )
     if payload.parent_group_id:
         _load_group_or_404(db, payload.parent_group_id)
     group = TransportKeyGroup(
@@ -372,7 +384,9 @@ def delete_transport_key_group(
         ).all()
         for child in direct_children:
             child.parent_group_id = reassign_to_group_id
-        direct_keys = db.scalars(select(TransportKey).where(TransportKey.group_id == group.id)).all()
+        direct_keys = db.scalars(
+            select(TransportKey).where(TransportKey.group_id == group.id)
+        ).all()
         for key in direct_keys:
             key.group_id = reassign_to_group_id
         db.delete(group)
@@ -382,7 +396,9 @@ def delete_transport_key_group(
         keys = db.scalars(select(TransportKey).where(TransportKey.group_id.in_(subtree_ids))).all()
         for key in keys:
             db.delete(key)
-        groups = db.scalars(select(TransportKeyGroup).where(TransportKeyGroup.id.in_(subtree_ids))).all()
+        groups = db.scalars(
+            select(TransportKeyGroup).where(TransportKeyGroup.id.in_(subtree_ids))
+        ).all()
         for child_group in groups:
             db.delete(child_group)
 
@@ -404,7 +420,9 @@ def list_transport_keys(
     db: Session = Depends(get_db_session),
     _: User = Depends(require_roles("admin", "operator", "viewer")),
 ) -> list[TransportKeyResponse]:
-    keys = db.scalars(select(TransportKey).order_by(TransportKey.sort_order.asc(), TransportKey.name.asc())).all()
+    keys = db.scalars(
+        select(TransportKey).order_by(TransportKey.sort_order.asc(), TransportKey.name.asc())
+    ).all()
     return [_to_key_response(key) for key in keys]
 
 
@@ -416,7 +434,9 @@ def create_transport_key(
 ) -> TransportKeyResponse:
     name = payload.name.strip()
     if _name_is_used(db, candidate=name):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Transport key/group name already exists")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Transport key/group name already exists"
+        )
     if payload.group_id is not None:
         _load_group_or_404(db, payload.group_id)
     key = TransportKey(
@@ -522,4 +542,3 @@ def trigger_transport_key_sync(
     )
     db.commit()
     return response
-

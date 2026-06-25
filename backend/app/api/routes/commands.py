@@ -110,4 +110,3 @@ def get_command(
 
     item, repeater_node_name = row
     return _to_response(item, repeater_node_name)
-

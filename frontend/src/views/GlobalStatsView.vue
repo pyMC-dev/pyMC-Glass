@@ -4,7 +4,7 @@
       <div>
         <h1 class="section-title">Global Stats</h1>
         <p class="section-subtitle">
-          Fleet-wide packet analytics across all repeaters, including distribution and recent packet traffic.
+          Network-wide packet analytics across all repeaters, including distribution and recent packet traffic.
         </p>
       </div>
       <div class="toolbar">
@@ -76,7 +76,7 @@
       </div>
     </UiPanelCard>
 
-    <UiPanelCard title="All Repeaters Packet Table" subtitle="Latest packets across the whole fleet.">
+    <UiPanelCard title="All Repeaters Packet Table" subtitle="Latest packets across the whole network.">
       <div class="table-header">
         <p class="section-subtitle">
           Showing {{ pageStart }}–{{ pageEnd }} of {{ filteredPackets.length }} packets

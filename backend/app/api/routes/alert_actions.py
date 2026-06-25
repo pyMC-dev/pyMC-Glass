@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+
 from app.db.models import (
     Alert,
     AlertActionIntegration,
@@ -18,20 +19,20 @@ from app.db.session import get_db_session
 from app.schemas.alert_actions import (
     AlertActionDeliveryResponse,
     AlertActionDeliverySummaryResponse,
-    AlertActionIntegrationTestRequest,
-    AlertActionIntegrationTestResponse,
     AlertActionIntegrationCreateRequest,
     AlertActionIntegrationResponse,
+    AlertActionIntegrationTestRequest,
+    AlertActionIntegrationTestResponse,
     AlertActionIntegrationUpdateRequest,
+    AlertActionProviderCapabilityResponse,
+    AlertActionTemplateCreateRequest,
+    AlertActionTemplatePreviewRequest,
+    AlertActionTemplatePreviewResponse,
+    AlertActionTemplateResponse,
+    AlertActionTemplateUpdateRequest,
     AlertPolicyActionBindingCreateRequest,
     AlertPolicyActionBindingResponse,
     AlertPolicyActionBindingUpdateRequest,
-    AlertActionProviderCapabilityResponse,
-    AlertActionTemplatePreviewRequest,
-    AlertActionTemplatePreviewResponse,
-    AlertActionTemplateCreateRequest,
-    AlertActionTemplateResponse,
-    AlertActionTemplateUpdateRequest,
 )
 from app.security.deps import require_roles
 from app.services.alert_action_delivery import (
@@ -40,8 +41,8 @@ from app.services.alert_action_delivery import (
     resolve_policy_template_for_alert,
 )
 from app.services.alert_actions import (
-    create_action_integration,
     create_action_binding,
+    create_action_integration,
     create_action_template,
     get_action_binding,
     get_action_integration,
@@ -77,17 +78,11 @@ def _integration_changes_for_audit(changes: dict) -> dict:
 
 
 def _template_changes_for_audit(changes: dict) -> dict:
-    filtered = {
-        key: value
-        for key, value in changes.items()
-        if key not in {"payload_template"}
-    }
+    filtered = {key: value for key, value in changes.items() if key not in {"payload_template"}}
     if "payload_template" in changes:
         payload_template = changes["payload_template"]
         filtered["payload_template_keys"] = (
-            sorted(payload_template.keys())
-            if isinstance(payload_template, dict)
-            else []
+            sorted(payload_template.keys()) if isinstance(payload_template, dict) else []
         )
     return filtered
 
@@ -224,11 +219,17 @@ def get_integration(
 ) -> AlertActionIntegrationResponse:
     integration = get_action_integration(db, integration_id)
     if integration is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert action integration not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Alert action integration not found"
+        )
     return to_integration_response(integration)
 
 
-@router.post("/integrations", response_model=AlertActionIntegrationResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/integrations",
+    response_model=AlertActionIntegrationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_integration(
     payload: AlertActionIntegrationCreateRequest,
     db: Session = Depends(get_db_session),
@@ -238,7 +239,9 @@ def create_integration(
         integration = create_action_integration(db, payload)
     except ValueError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
@@ -271,13 +274,17 @@ def update_integration(
 ) -> AlertActionIntegrationResponse:
     integration = get_action_integration(db, integration_id)
     if integration is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert action integration not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Alert action integration not found"
+        )
     changes = payload.model_dump(exclude_unset=True)
     try:
         integration = update_action_integration(db, integration, payload)
     except ValueError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
@@ -305,7 +312,9 @@ def delete_integration(
 ) -> None:
     integration = get_action_integration(db, integration_id)
     if integration is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert action integration not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Alert action integration not found"
+        )
     integration_name = integration.name
     provider_type = integration.provider_type
     db.delete(integration)
@@ -336,11 +345,15 @@ def get_template(
 ) -> AlertActionTemplateResponse:
     template = get_action_template(db, template_id)
     if template is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert action template not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Alert action template not found"
+        )
     return to_template_response(template)
 
 
-@router.post("/templates", response_model=AlertActionTemplateResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/templates", response_model=AlertActionTemplateResponse, status_code=status.HTTP_201_CREATED
+)
 def create_template(
     payload: AlertActionTemplateCreateRequest,
     db: Session = Depends(get_db_session),
@@ -350,10 +363,14 @@ def create_template(
         template = create_action_template(db, payload)
     except ValueError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     except KeyError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
@@ -386,16 +403,22 @@ def update_template(
 ) -> AlertActionTemplateResponse:
     template = get_action_template(db, template_id)
     if template is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert action template not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Alert action template not found"
+        )
     changes = payload.model_dump(exclude_unset=True)
     try:
         template = update_action_template(db, template, payload)
     except ValueError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     except KeyError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
@@ -423,7 +446,9 @@ def delete_template(
 ) -> None:
     template = get_action_template(db, template_id)
     if template is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert action template not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Alert action template not found"
+        )
     template_name = template.name
     db.delete(template)
     write_audit_log(
@@ -474,7 +499,9 @@ def create_binding(
         binding = create_action_binding(db, payload)
     except ValueError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
@@ -517,7 +544,9 @@ def update_binding(
         binding = update_action_binding(db, binding, payload)
     except ValueError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
@@ -577,16 +606,14 @@ def preview_template(
     if payload.action_template_id:
         action_template = get_action_template(db, payload.action_template_id)
         if action_template is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert action template not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Alert action template not found"
+            )
     title_template = (
-        action_template.title_template
-        if action_template is not None
-        else payload.title_template
+        action_template.title_template if action_template is not None else payload.title_template
     )
     body_template = (
-        action_template.body_template
-        if action_template is not None
-        else payload.body_template
+        action_template.body_template if action_template is not None else payload.body_template
     )
     payload_template = (
         parse_action_template_payload(action_template)
@@ -659,7 +686,9 @@ def test_integration_send(
 ) -> AlertActionIntegrationTestResponse:
     integration = get_action_integration(db, integration_id)
     if integration is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert action integration not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Alert action integration not found"
+        )
     registry = get_notification_provider_registry()
     try:
         settings = parse_integration_settings(integration)
@@ -731,18 +760,26 @@ def list_deliveries(
     action_template_ids = sorted(
         {event.action_template_id for event in events if event.action_template_id}
     )
-    integrations = {
-        row.id: row
-        for row in db.scalars(
-            select(AlertActionIntegration).where(AlertActionIntegration.id.in_(integration_ids))
-        ).all()
-    } if integration_ids else {}
-    action_templates = {
-        row.id: row
-        for row in db.scalars(
-            select(AlertActionTemplate).where(AlertActionTemplate.id.in_(action_template_ids))
-        ).all()
-    } if action_template_ids else {}
+    integrations = (
+        {
+            row.id: row
+            for row in db.scalars(
+                select(AlertActionIntegration).where(AlertActionIntegration.id.in_(integration_ids))
+            ).all()
+        }
+        if integration_ids
+        else {}
+    )
+    action_templates = (
+        {
+            row.id: row
+            for row in db.scalars(
+                select(AlertActionTemplate).where(AlertActionTemplate.id.in_(action_template_ids))
+            ).all()
+        }
+        if action_template_ids
+        else {}
+    )
     return [
         _to_delivery_response(
             event,
@@ -758,9 +795,12 @@ def deliveries_summary(
     db: Session = Depends(get_db_session),
     _: User = Depends(require_roles("admin", "operator", "viewer")),
 ) -> AlertActionDeliverySummaryResponse:
-    total = db.scalar(
-        select(func.count(NotificationEvent.id)).where(NotificationEvent.channel == "action")
-    ) or 0
+    total = (
+        db.scalar(
+            select(func.count(NotificationEvent.id)).where(NotificationEvent.channel == "action")
+        )
+        or 0
+    )
     by_status_rows = db.execute(
         select(NotificationEvent.status, func.count(NotificationEvent.id))
         .where(NotificationEvent.channel == "action")
@@ -773,8 +813,7 @@ def deliveries_summary(
     ).all()
     by_status = {str(status_key): int(count) for status_key, count in by_status_rows}
     by_provider = {
-        str(provider_key or "unknown"): int(count)
-        for provider_key, count in by_provider_rows
+        str(provider_key or "unknown"): int(count) for provider_key, count in by_provider_rows
     }
     return AlertActionDeliverySummaryResponse(
         total=int(total),

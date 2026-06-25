@@ -16,15 +16,15 @@ from app.db.models import (
 )
 from app.schemas.alert_actions import (
     VALID_ALERT_ACTION_EVENT_TYPES,
-    AlertPolicyActionBindingCreateRequest,
-    AlertPolicyActionBindingResponse,
-    AlertPolicyActionBindingUpdateRequest,
     AlertActionIntegrationCreateRequest,
     AlertActionIntegrationResponse,
     AlertActionIntegrationUpdateRequest,
     AlertActionTemplateCreateRequest,
     AlertActionTemplateResponse,
     AlertActionTemplateUpdateRequest,
+    AlertPolicyActionBindingCreateRequest,
+    AlertPolicyActionBindingResponse,
+    AlertPolicyActionBindingUpdateRequest,
 )
 from app.services.notification_providers import NotificationProviderRegistry
 
@@ -159,11 +159,15 @@ def to_template_response(template: AlertActionTemplate) -> AlertActionTemplateRe
 
 
 def list_action_integrations(db: Session) -> list[AlertActionIntegration]:
-    return db.scalars(select(AlertActionIntegration).order_by(AlertActionIntegration.name.asc())).all()
+    return db.scalars(
+        select(AlertActionIntegration).order_by(AlertActionIntegration.name.asc())
+    ).all()
 
 
 def get_action_integration(db: Session, integration_id: str) -> AlertActionIntegration | None:
-    return db.scalar(select(AlertActionIntegration).where(AlertActionIntegration.id == integration_id))
+    return db.scalar(
+        select(AlertActionIntegration).where(AlertActionIntegration.id == integration_id)
+    )
 
 
 def create_action_integration(
@@ -182,11 +186,7 @@ def create_action_integration(
         description=payload.description,
         enabled=1 if payload.enabled else 0,
         settings_json=serialize_integration_settings(validated_settings),
-        secrets_json=(
-            serialize_integration_secrets(payload.secrets)
-            if payload.secrets
-            else None
-        ),
+        secrets_json=(serialize_integration_secrets(payload.secrets) if payload.secrets else None),
     )
     db.add(integration)
     db.flush()
@@ -278,9 +278,7 @@ def update_action_template(
     if "payload_template" in changes:
         payload_template = changes["payload_template"]
         template.payload_template_json = (
-            _serialize_json(payload_template)
-            if isinstance(payload_template, dict)
-            else None
+            _serialize_json(payload_template) if isinstance(payload_template, dict) else None
         )
     if "default_event_types" in changes:
         default_events = changes["default_event_types"]
@@ -317,7 +315,9 @@ def list_action_bindings(db: Session) -> list[AlertPolicyActionBinding]:
 
 
 def get_action_binding(db: Session, binding_id: str) -> AlertPolicyActionBinding | None:
-    return db.scalar(select(AlertPolicyActionBinding).where(AlertPolicyActionBinding.id == binding_id))
+    return db.scalar(
+        select(AlertPolicyActionBinding).where(AlertPolicyActionBinding.id == binding_id)
+    )
 
 
 def _validate_binding_relationships(
@@ -343,10 +343,7 @@ def _validate_binding_relationships(
     if action_template is None:
         raise ValueError("Referenced alert action template was not found")
     template_provider_type = _normalize_provider_type(action_template.provider_type)
-    if (
-        template_provider_type is not None
-        and template_provider_type != integration.provider_type
-    ):
+    if template_provider_type is not None and template_provider_type != integration.provider_type:
         raise ValueError(
             "Action template provider_type must match integration provider_type when specified"
         )

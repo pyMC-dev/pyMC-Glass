@@ -9,4 +9,3 @@ class AdoptionActionResponse(BaseModel):
     repeater_id: str
     node_name: str
     status: str
-

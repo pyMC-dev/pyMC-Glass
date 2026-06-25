@@ -135,4 +135,3 @@ class TransportKeySyncTriggerResponse(BaseModel):
     payload_hash: str
     queued_commands: int
     skipped_commands: int
-

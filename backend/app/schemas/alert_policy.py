@@ -116,9 +116,7 @@ class AlertPolicyAssignmentCreateRequest(BaseModel):
     def validate_scope_type(cls, value: str) -> str:
         normalized = value.strip()
         if normalized not in VALID_SCOPE_TYPES:
-            raise ValueError(
-                f"scope_type must be one of: {', '.join(sorted(VALID_SCOPE_TYPES))}"
-            )
+            raise ValueError(f"scope_type must be one of: {', '.join(sorted(VALID_SCOPE_TYPES))}")
         return normalized
 
 

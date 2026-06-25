@@ -9,6 +9,7 @@ class ManagedMqttSettingsResponse(BaseModel):
     mqtt_broker_port: int
     mqtt_base_topic: str
     mqtt_tls_enabled: bool
+    mqtt_broker_additional_hosts: list[str] = Field(default_factory=list)
     source: str
     updated_at: datetime | None = None
 
@@ -19,6 +20,7 @@ class ManagedMqttSettingsUpdateRequest(BaseModel):
     mqtt_broker_port: int = Field(ge=1, le=65535)
     mqtt_base_topic: str = Field(min_length=1, max_length=255)
     mqtt_tls_enabled: bool
+    mqtt_broker_additional_hosts: list[str] = Field(default_factory=list, max_length=16)
     queue_to_repeaters: bool = False
     reason: str | None = Field(default=None, max_length=256)
 

@@ -2,16 +2,17 @@ services:
   pki-init:
     build:
       context: ./backend
-    container_name: pymc_glass_pki_init
+    container_name: openhop_glass_pki_init
     restart: "no"
     env_file:
       - ./backend/.env
     command: ["python", "-m", "app.scripts.pki_init"]
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./pki:/app/data/pki
   postgres:
     image: timescale/timescaledb:latest-pg16
-    container_name: pymc_glass_postgres
+    container_name: openhop_glass_postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: pymc_glass
@@ -20,16 +21,39 @@ services:
     ports:
       - "5432:5432"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d pymc_glass"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 10s
       timeout: 5s
       retries: 10
 
+  postgres-init:
+    image: timescale/timescaledb:latest-pg16
+    container_name: openhop_glass_postgres_init
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    command:
+      - sh
+      - -c
+      - |
+        if ! psql -h postgres -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'pymc_glass'" | grep -qx 1; then
+          createdb -h postgres -U postgres pymc_glass
+        fi
+        if ! psql -h postgres -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'openhop_glass'" | grep -qx 1; then
+          createdb -h postgres -U postgres openhop_glass
+        fi
+
   mosquitto:
     image: eclipse-mosquitto:2
-    container_name: pymc_glass_mosquitto
+    container_name: openhop_glass_mosquitto
     restart: unless-stopped
     depends_on:
       pki-init:
@@ -37,6 +61,7 @@ services:
     ports:
       - "8883:8883"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - ./pki:/mosquitto/pki:ro
       - mosquitto_data:/mosquitto/data
@@ -50,11 +75,11 @@ services:
   backend:
     build:
       context: ./backend
-    container_name: pymc_glass_backend
+    container_name: openhop_glass_backend
     restart: unless-stopped
     depends_on:
-      postgres:
-        condition: service_healthy
+      postgres-init:
+        condition: service_completed_successfully
       pki-init:
         condition: service_completed_successfully
       mosquitto:
@@ -64,6 +89,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./pki:/app/data/pki
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"]
@@ -73,7 +99,7 @@ services:
 
   frontend:
     image: node:22-alpine
-    container_name: pymc_glass_frontend
+    container_name: openhop_glass_frontend
     restart: unless-stopped
     working_dir: /app
     command: sh -c "npm install && npm run dev"
@@ -81,6 +107,7 @@ services:
       VITE_API_PROXY_TARGET: http://backend:8080
       VITE_API_BASE_URL: ""
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./frontend:/app
     ports:
       - "5173:5173"

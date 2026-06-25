@@ -11,6 +11,7 @@ from app.security.tokens import hash_token
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
+
 def _authenticate_token(raw_token: str, db: Session) -> User:
     token_hash = hash_token(raw_token)
     token = db.scalar(select(AuthToken).where(AuthToken.token_hash == token_hash))
@@ -49,15 +50,14 @@ def get_current_user(
         )
     return _authenticate_token(credentials.credentials, db)
 
+
 def get_current_user_bearer_or_query(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     token: str | None = Query(default=None),
     db: Session = Depends(get_db_session),
 ) -> User:
     raw_token = (
-        credentials.credentials
-        if credentials is not None
-        else (token.strip() if token else None)
+        credentials.credentials if credentials is not None else (token.strip() if token else None)
     )
     if not raw_token:
         raise HTTPException(
@@ -77,4 +77,3 @@ def require_roles(*allowed_roles: str):
         return current_user
 
     return _dependency
-

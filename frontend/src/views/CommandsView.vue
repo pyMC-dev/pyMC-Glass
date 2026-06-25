@@ -17,7 +17,32 @@
         <form class="panel-form" @submit.prevent="queueEntry">
           <label class="field-label">
             Node name
-            <input v-model.trim="queueForm.node_name" class="field" required />
+            <select
+              v-model="queueForm.node_name"
+              class="field-select"
+              :required="!queueForm.queueAll && queueForm.selectedNodeNames.length === 0"
+              :disabled="queueForm.queueAll || queueForm.selectedNodeNames.length > 0"
+            >
+              <option value="">Select a repeater</option>
+              <option v-for="repeater in appState.repeaters" :key="repeater.id" :value="repeater.node_name">
+                {{ repeater.node_name }} · {{ repeater.status }}
+              </option>
+            </select>
+          </label>
+          <div class="checkbox-grid command-target-grid">
+            <label v-for="repeater in appState.repeaters" :key="repeater.id" class="toggle-row compact">
+              <input
+                v-model="queueForm.selectedNodeNames"
+                type="checkbox"
+                :value="repeater.node_name"
+                :disabled="queueForm.queueAll"
+              />
+              <span>{{ repeater.node_name }} <small class="text-slate-500">({{ repeater.status }})</small></span>
+            </label>
+          </div>
+          <label class="toggle-row">
+            <input v-model="queueForm.queueAll" type="checkbox" @change="onQueueAllChange" />
+            <span>Queue to all repeaters</span>
           </label>
           <label class="field-label">
             Action
@@ -39,8 +64,8 @@
               placeholder='{"key":"value"}'
             />
           </label>
-          <button class="btn btn-primary" :disabled="!canOperate || appState.actionLoading">
-            {{ appState.actionLoading ? "Queueing..." : "Queue command" }}
+          <button class="btn btn-primary" :disabled="!canOperate || appState.actionLoading || targetNodeNames.length === 0">
+            {{ appState.actionLoading ? "Queueing..." : `Queue command${targetNodeNames.length > 1 ? "s" : ""}` }}
           </button>
         </form>
       </article>
@@ -131,7 +156,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import UiDataTable from "../components/ui/UiDataTable.vue";
 
 import StatusPill from "../components/ui/StatusPill.vue";
@@ -141,7 +166,9 @@ import {
   canOperate,
   formatTimestamp,
   loadCommandDetail,
+  queueBulkCommands,
   queueCommandEntry,
+  refreshAllData,
   refreshCommandsList,
 } from "../state/appState";
 
@@ -150,6 +177,8 @@ const queueForm = reactive({
   action: COMMAND_ACTIONS[0],
   paramsJson: "{}",
   reason: "",
+  queueAll: false,
+  selectedNodeNames: [] as string[],
 });
 
 const filters = reactive({
@@ -164,8 +193,21 @@ const detailDialogOpen = ref(false);
 const detailLoading = ref(false);
 const detailError = ref<string | null>(null);
 
+const targetNodeNames = computed(() => {
+  if (queueForm.queueAll) {
+    return appState.repeaters.map((repeater) => repeater.node_name);
+  }
+  if (queueForm.selectedNodeNames.length > 0) {
+    return [...queueForm.selectedNodeNames];
+  }
+  return queueForm.node_name ? [queueForm.node_name] : [];
+});
+
 onMounted(() => {
   window.addEventListener("keydown", handleEscapeKey);
+  if (appState.token && appState.repeaters.length === 0) {
+    void refreshAllData();
+  }
 });
 
 onBeforeUnmount(() => {
@@ -184,16 +226,29 @@ async function queueEntry(): Promise<void> {
       }
     }
 
-    await queueCommandEntry({
-      node_name: queueForm.node_name,
-      action: queueForm.action,
-      params,
-      requested_by: appState.user?.email || "operator",
-      reason: queueForm.reason || undefined,
-    });
+    if (targetNodeNames.value.length > 1 || queueForm.queueAll || queueForm.selectedNodeNames.length > 0) {
+      await queueBulkCommands(
+        targetNodeNames.value.map((nodeName) => ({
+          node_name: nodeName,
+          action: queueForm.action,
+          params,
+          requested_by: appState.user?.email || "operator",
+          reason: queueForm.reason || undefined,
+        })),
+      );
+    } else {
+      await queueCommandEntry({
+        node_name: queueForm.node_name,
+        action: queueForm.action,
+        params,
+        requested_by: appState.user?.email || "operator",
+        reason: queueForm.reason || undefined,
+      });
+    }
 
     queueForm.paramsJson = "{}";
     queueForm.reason = "";
+    queueForm.selectedNodeNames = [];
   } catch (error) {
     appState.toastError = error instanceof Error ? error.message : "Invalid command payload.";
   }
@@ -208,6 +263,13 @@ async function applyFilters(): Promise<void> {
     });
   } catch {
     // Error already surfaced via global toast.
+  }
+}
+
+function onQueueAllChange(): void {
+  if (queueForm.queueAll) {
+    queueForm.node_name = "";
+    queueForm.selectedNodeNames = [];
   }
 }
 
@@ -301,6 +363,11 @@ function handleEscapeKey(event: KeyboardEvent): void {
   color: #dbe5f3;
   overflow-x: auto;
   font-size: 0.8rem;
+}
+
+.command-target-grid {
+  max-height: 12rem;
+  overflow-y: auto;
 }
 
 @media (max-width: 900px) {

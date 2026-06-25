@@ -4,7 +4,7 @@
       <div>
         <h1 class="section-title">Repeater Map</h1>
         <p class="section-subtitle">
-          Location-based fleet visibility. Location format expected: <code>lat,lng</code>.
+          Location-based network visibility. Location format expected: <code>lat,lng</code>.
         </p>
       </div>
       <button class="btn btn-secondary" :disabled="appState.dataLoading" @click="refreshAllData()">
@@ -23,27 +23,7 @@
       <p v-if="mappedRepeaters.length === 0" class="section-subtitle">
         No parseable coordinates. Set repeater location as <code>lat,lng</code> (example: <code>51.5074,-0.1278</code>).
       </p>
-      <svg v-else class="map-canvas" viewBox="0 0 1000 500" role="img" aria-label="Repeater map">
-        <rect x="0" y="0" width="1000" height="500" rx="12" class="map-bg" />
-        <g class="map-grid">
-          <line v-for="line in 9" :key="`h-${line}`" :x1="0" :y1="line * 50" :x2="1000" :y2="line * 50" />
-          <line v-for="line in 19" :key="`v-${line}`" :x1="line * 50" :y1="0" :x2="line * 50" :y2="500" />
-        </g>
-        <g>
-          <circle
-            v-for="item in mappedRepeaters"
-            :key="item.id"
-            :cx="item.x"
-            :cy="item.y"
-            r="7"
-            :fill="statusColor(item.status)"
-            stroke="#dce8ff"
-            stroke-width="1.2"
-          >
-            <title>{{ `${item.node_name} (${item.location}) - ${item.status}` }}</title>
-          </circle>
-        </g>
-      </svg>
+      <div v-else ref="mapElement" class="leaflet-map" aria-label="Repeater map"></div>
     </article>
 
     <section class="grid-2">
@@ -97,11 +77,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import UiDataTable from "../components/ui/UiDataTable.vue";
 import UiStatCard from "../components/ui/UiStatCard.vue";
 
 import StatusPill from "../components/ui/StatusPill.vue";
+import { useTheme } from "../composables/useTheme";
 import { appState, refreshAllData } from "../state/appState";
 
 interface MapPoint {
@@ -109,9 +92,15 @@ interface MapPoint {
   node_name: string;
   location: string;
   status: string;
-  x: number;
-  y: number;
+  lat: number;
+  lng: number;
 }
+
+const mapElement = ref<HTMLElement | null>(null);
+const { theme } = useTheme();
+let map: L.Map | null = null;
+let markerLayer: L.LayerGroup | null = null;
+let tileLayer: L.TileLayer | null = null;
 
 function parseCoords(location: string | null): { lat: number; lng: number } | null {
   if (!location) {
@@ -180,8 +169,8 @@ const mappedRepeaters = computed<MapPoint[]>(() =>
         node_name: repeater.node_name,
         location: repeater.location,
         status: repeater.status,
-        x: ((coords.lng + 180) / 360) * 1000,
-        y: ((90 - coords.lat) / 180) * 500,
+        lat: coords.lat,
+        lng: coords.lng,
       };
     })
     .filter((value): value is MapPoint => Boolean(value)),
@@ -195,7 +184,90 @@ onMounted(async () => {
   if (appState.token) {
     await refreshAllData();
   }
+  await nextTick();
+  renderMap();
 });
+
+onBeforeUnmount(() => {
+  if (map) {
+    map.remove();
+    map = null;
+    markerLayer = null;
+    tileLayer = null;
+  }
+});
+
+watch(mappedRepeaters, () => {
+  void nextTick().then(renderMap);
+});
+
+watch(theme, () => {
+  updateTileLayer();
+});
+
+function mapTileUrl(): string {
+  return "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+}
+
+function updateTileLayer(): void {
+  if (!map) return;
+  if (tileLayer) {
+    tileLayer.removeFrom(map);
+    tileLayer = null;
+  }
+  tileLayer = L.tileLayer(mapTileUrl(), {
+    maxZoom: 19,
+    crossOrigin: true,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  }).addTo(map);
+}
+
+function renderMap(): void {
+  if (!mapElement.value || mappedRepeaters.value.length === 0) {
+    return;
+  }
+
+  if (!map) {
+    map = L.map(mapElement.value, {
+      worldCopyJump: true,
+      zoomControl: true,
+    });
+    updateTileLayer();
+    markerLayer = L.layerGroup().addTo(map);
+  }
+
+  markerLayer?.clearLayers();
+  const bounds = L.latLngBounds([]);
+  for (const item of mappedRepeaters.value) {
+    const marker = L.circleMarker([item.lat, item.lng], {
+      radius: 8,
+      color: "#dce8ff",
+      weight: 1.4,
+      fillColor: statusColor(item.status),
+      fillOpacity: 0.9,
+    }).bindPopup(`<strong>${escapeHtml(item.node_name)}</strong><br>${escapeHtml(item.location)}<br>${escapeHtml(item.status)}`);
+    marker.addTo(markerLayer as L.LayerGroup);
+    bounds.extend([item.lat, item.lng]);
+  }
+
+  if (bounds.isValid()) {
+    map.fitBounds(bounds.pad(0.25), { maxZoom: 12 });
+  }
+  map.invalidateSize();
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>'"]/g, (char) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "'": "&#39;",
+      '"': "&quot;",
+    };
+    return entities[char] ?? char;
+  });
+}
 
 function statusColor(status: string): string {
   if (["adopted", "connected", "success"].includes(status)) {
@@ -213,18 +285,11 @@ function statusColor(status: string): string {
 
 <style scoped>
 
-.map-canvas {
+.leaflet-map {
   width: 100%;
-  height: auto;
-  min-height: 260px;
-}
-
-.map-bg {
-  fill: #0a162a;
-}
-
-.map-grid line {
-  stroke: rgba(152, 170, 200, 0.2);
-  stroke-width: 1;
+  min-height: 420px;
+  border: 1px solid rgba(130, 160, 210, 0.22);
+  border-radius: 16px;
+  overflow: hidden;
 }
 </style>

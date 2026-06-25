@@ -1,2 +1,1 @@
-"""API package for pyMC_Glass."""
-
+"""API package for openHop Glass."""

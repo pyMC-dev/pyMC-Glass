@@ -4,7 +4,7 @@
       <div>
         <h1 class="section-title">Dashboard</h1>
         <p class="section-subtitle">
-          Live snapshot of fleet posture, command reliability, and operator activity.
+          Live snapshot of network posture, command reliability, and operator activity.
         </p>
       </div>
       <button class="btn btn-secondary" :disabled="isRefreshing" @click="refreshDashboard()">
@@ -77,7 +77,7 @@
       </UiPanelCard>
 
       <UiPanelCard
-        title="Recent Fleet Packets"
+        title="Recent Network Packets"
         subtitle="Most recent packets seen across all repeaters."
       >
         <UiDataTable>
@@ -136,7 +136,7 @@
           </div>
         </div>
         <p v-if="isTopologyAdvertStale" class="warning-text">Topology advert feed appears stale.</p>
-        <router-link class="btn btn-ghost btn-sm" to="/insights/topology">
+        <router-link class="btn btn-ghost btn-sm" to="/insights-topology">
           Open Topology Insights
         </router-link>
       </UiPanelCard>

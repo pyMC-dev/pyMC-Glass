@@ -17,6 +17,14 @@ _MANAGED_MQTT_FIELDS = (
     "mqtt_broker_port",
     "mqtt_base_topic",
     "mqtt_tls_enabled",
+    "mqtt_broker_additional_hosts",
+)
+_MANAGED_MQTT_REPEATER_FIELDS = (
+    "mqtt_enabled",
+    "mqtt_broker_host",
+    "mqtt_broker_port",
+    "mqtt_base_topic",
+    "mqtt_tls_enabled",
 )
 
 
@@ -32,6 +40,7 @@ def default_managed_mqtt_settings() -> dict[str, Any]:
         "mqtt_broker_port": settings.mqtt_broker_port,
         "mqtt_base_topic": settings.mqtt_base_topic,
         "mqtt_tls_enabled": settings.mqtt_repeater_tls_enabled,
+        "mqtt_broker_additional_hosts": [],
     }
     if settings.mqtt_broker_username:
         payload["mqtt_username"] = settings.mqtt_broker_username
@@ -55,13 +64,37 @@ def sanitize_managed_mqtt_overrides(raw: dict[str, Any]) -> dict[str, Any]:
         sanitized["mqtt_base_topic"] = str(raw["mqtt_base_topic"] or "").strip().strip("/")
     if "mqtt_tls_enabled" in raw:
         sanitized["mqtt_tls_enabled"] = bool(raw["mqtt_tls_enabled"])
+    if "mqtt_broker_additional_hosts" in raw:
+        sanitized["mqtt_broker_additional_hosts"] = _sanitize_host_list(
+            raw["mqtt_broker_additional_hosts"]
+        )
     return sanitized
 
 
+def _sanitize_host_list(raw: Any) -> list[str]:
+    if isinstance(raw, str):
+        candidates = raw.replace("\n", ",").split(",")
+    elif isinstance(raw, list):
+        candidates = raw
+    else:
+        return []
+
+    hosts: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        host = str(candidate or "").strip()
+        if not host:
+            continue
+        key = host.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        hosts.append(host)
+    return hosts
+
+
 def _load_stored_overrides(db: Session) -> tuple[dict[str, Any], datetime | None]:
-    row = db.scalar(
-        select(SystemSetting).where(SystemSetting.key == MANAGED_MQTT_SETTINGS_KEY)
-    )
+    row = db.scalar(select(SystemSetting).where(SystemSetting.key == MANAGED_MQTT_SETTINGS_KEY))
     if row is None:
         return {}, None
     try:
@@ -163,3 +196,7 @@ def save_config_snapshot_encryption_keys(
 
 def managed_mqtt_view_payload(settings_payload: dict[str, Any]) -> dict[str, Any]:
     return {field: settings_payload.get(field) for field in _MANAGED_MQTT_FIELDS}
+
+
+def managed_mqtt_repeater_payload(settings_payload: dict[str, Any]) -> dict[str, Any]:
+    return {field: settings_payload.get(field) for field in _MANAGED_MQTT_REPEATER_FIELDS}

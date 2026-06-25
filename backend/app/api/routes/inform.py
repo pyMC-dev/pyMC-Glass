@@ -11,14 +11,18 @@ from app.config import get_settings
 from app.contracts.v1.inform import InformRequestV1
 from app.db.models import Certificate, CommandQueueItem, InformSnapshot, Repeater
 from app.db.session import get_db_session
-from app.services.audit import write_audit_log
 from app.services.alert_policy import evaluate_policies_for_repeater
+from app.services.audit import write_audit_log
 from app.services.config_snapshot import (
     ConfigSnapshotService,
     SnapshotEncryptionError,
     SnapshotPayloadError,
 )
 from app.services.pki import PkiService
+from app.services.repeater_policy import (
+    mark_repeater_policy_sync_dispatched,
+    mark_repeater_policy_sync_result,
+)
 from app.services.system_settings import (
     get_effective_config_snapshot_encryption_keys,
     get_effective_managed_mqtt_settings,
@@ -41,6 +45,26 @@ def _normalize_datetime(value: datetime | None) -> datetime | None:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
+
+
+def _is_docker_bridge_gateway(host: str | None) -> bool:
+    if not host:
+        return False
+    parts = host.split(".")
+    if len(parts) != 4:
+        return False
+    try:
+        octets = [int(part) for part in parts]
+    except ValueError:
+        return False
+    return octets[0] == 172 and 16 <= octets[1] <= 31 and octets[2:] == [0, 1]
+
+
+def _inform_source_ip(request: Request, current_ip: str | None = None) -> str | None:
+    source_ip = request.client.host if request.client else None
+    if _is_docker_bridge_gateway(source_ip) and current_ip and not _is_docker_bridge_gateway(current_ip):
+        return current_ip
+    return source_ip or current_ip
 
 
 def _compact_json(value: dict[str, Any]) -> str | None:
@@ -233,6 +257,9 @@ def inform(
     )
     force_certificate_renewal = False
     repeater = db.scalar(select(Repeater).where(Repeater.node_name == payload.node_name))
+    system_payload = payload.system.model_dump()
+    if payload.sensors is not None:
+        system_payload["sensors"] = payload.sensors
 
     if repeater is None:
         location = _normalize_location(payload.location) or _extract_location_from_settings(
@@ -249,10 +276,10 @@ def inform(
             state=payload.state,
             location=location,
             config_hash=payload.config_hash,
-            inform_ip=request.client.host if request.client else None,
+            inform_ip=_inform_source_ip(request),
             last_inform_at=now,
             cert_expires_at=_normalize_datetime(payload.cert_expires_at),
-            system_json=_compact_json(payload.system.model_dump()),
+            system_json=_compact_json(system_payload),
             radio_json=_compact_json(payload.radio.model_dump()),
             counters_json=_compact_json(payload.counters.model_dump()),
             settings_json=_compact_json(payload.settings),
@@ -275,9 +302,9 @@ def inform(
         if location is not None:
             repeater.location = location
         repeater.config_hash = payload.config_hash
-        repeater.inform_ip = request.client.host if request.client else repeater.inform_ip
+        repeater.inform_ip = _inform_source_ip(request, repeater.inform_ip)
         repeater.last_inform_at = now
-        repeater.system_json = _compact_json(payload.system.model_dump())
+        repeater.system_json = _compact_json(system_payload)
         repeater.radio_json = _compact_json(payload.radio.model_dump())
         repeater.counters_json = _compact_json(payload.counters.model_dump())
         if payload.settings:
@@ -394,6 +421,15 @@ def inform(
                 message=result.message,
                 completed_at=result.completed_at,
             )
+        if queued.command == "policy_sync":
+            mark_repeater_policy_sync_result(
+                db,
+                repeater_id=repeater.id,
+                command_id=queued.id,
+                status=result.status,
+                message=result.message,
+                completed_at=result.completed_at,
+            )
         write_audit_log(
             db,
             action="command_result_ingested",
@@ -435,6 +471,12 @@ def inform(
         next_command.status = "dispatched"
         if next_command.command == "transport_keys_sync":
             mark_transport_key_sync_dispatched(
+                db,
+                repeater_id=repeater.id,
+                command_id=next_command.id,
+            )
+        if next_command.command == "policy_sync":
+            mark_repeater_policy_sync_dispatched(
                 db,
                 repeater_id=repeater.id,
                 command_id=next_command.id,

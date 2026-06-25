@@ -15,4 +15,3 @@ class CommandQueueItemResponse(BaseModel):
     requested_by: str | None = None
     created_at: datetime
     completed_at: datetime | None = None
-

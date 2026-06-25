@@ -2,14 +2,14 @@ import json
 import re
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
 from cryptography.fernet import Fernet
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.db.models import CommandQueueItem, Repeater, User
 from app.db.session import get_db_session
-from app.config import get_settings
 from app.schemas.system_settings import (
     ConfigSnapshotEncryptionKeyGenerateRequest,
     ConfigSnapshotEncryptionKeyGenerateResponse,
@@ -21,14 +21,15 @@ from app.schemas.system_settings import (
 )
 from app.security.deps import require_roles
 from app.services.audit import write_audit_log
+from app.services.pki import PkiService
 from app.services.system_settings import (
     get_effective_config_snapshot_encryption_keys,
     get_effective_managed_mqtt_settings,
+    managed_mqtt_repeater_payload,
     managed_mqtt_view_payload,
     save_config_snapshot_encryption_keys,
     save_managed_mqtt_settings,
 )
-from app.services.pki import PkiService
 
 router = APIRouter(prefix="/api/system-settings")
 _KEY_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
@@ -54,6 +55,7 @@ def _to_response(
         mqtt_broker_port=int(view_payload.get("mqtt_broker_port", 1883)),
         mqtt_base_topic=str(view_payload.get("mqtt_base_topic", "glass")),
         mqtt_tls_enabled=bool(view_payload.get("mqtt_tls_enabled", False)),
+        mqtt_broker_additional_hosts=list(view_payload.get("mqtt_broker_additional_hosts") or []),
         source=source,
         updated_at=_normalize_datetime(updated_at),
     )
@@ -75,7 +77,7 @@ def _queue_update_for_repeaters(
 
     payload = {
         "config": {
-            "glass_managed": managed_mqtt_view_payload(effective_settings),
+            "glass_managed": managed_mqtt_repeater_payload(effective_settings),
         },
         "merge_mode": "patch",
     }
@@ -154,10 +156,16 @@ def update_managed_mqtt_settings(
             "mqtt_broker_port",
             "mqtt_base_topic",
             "mqtt_tls_enabled",
+            "mqtt_broker_additional_hosts",
         }
     )
     save_payload["mqtt_base_topic"] = str(save_payload["mqtt_base_topic"]).strip().strip("/")
     save_payload["mqtt_broker_host"] = str(save_payload["mqtt_broker_host"]).strip()
+    save_payload["mqtt_broker_additional_hosts"] = [
+        str(host).strip()
+        for host in save_payload.get("mqtt_broker_additional_hosts", [])
+        if str(host).strip()
+    ]
     if not save_payload["mqtt_broker_host"]:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -172,10 +180,15 @@ def update_managed_mqtt_settings(
 
     effective_settings, _, _ = get_effective_managed_mqtt_settings(db)
     broker_host = str(effective_settings.get("mqtt_broker_host", "")).strip()
+    additional_hosts = [
+        str(host).strip()
+        for host in effective_settings.get("mqtt_broker_additional_hosts", [])
+        if str(host).strip()
+    ]
     pki_service = PkiService(get_settings())
     pki_service.ensure_ca()
     broker_cert_reissued = pki_service.ensure_mqtt_broker_server_certificate(
-        extra_san_hosts=[broker_host] if broker_host else None
+        extra_san_hosts=([broker_host] if broker_host else []) + additional_hosts
     )
     queued_commands = 0
     if payload.queue_to_repeaters:
@@ -198,6 +211,7 @@ def update_managed_mqtt_settings(
             "mqtt_broker_port": effective_settings.get("mqtt_broker_port"),
             "mqtt_base_topic": effective_settings.get("mqtt_base_topic"),
             "mqtt_tls_enabled": effective_settings.get("mqtt_tls_enabled"),
+            "mqtt_broker_additional_hosts": additional_hosts,
             "queue_to_repeaters": payload.queue_to_repeaters,
             "queued_commands": queued_commands,
             "broker_cert_reissued": broker_cert_reissued,

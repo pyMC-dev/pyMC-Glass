@@ -55,6 +55,7 @@ class InformRequestV1(BaseModel):
     radio: InformRadioStatsV1
     counters: InformCountersV1
     settings: Dict[str, Any] = Field(default_factory=dict)
+    sensors: Union[Dict[str, Any], List[Dict[str, Any]], None] = None
     command_results: List[CommandResultPayloadV1] = Field(default_factory=list)
 
 
@@ -100,4 +101,3 @@ InformResponseV1 = Union[
     InformCertRenewalResponseV1,
     InformUpgradeResponseV1,
 ]
-

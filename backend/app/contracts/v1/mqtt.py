@@ -26,4 +26,3 @@ class MqttEventEnvelopeV1(MqttEnvelopeBaseV1):
     type: Literal["event"] = "event"
     event_name: str = Field(min_length=1, max_length=64)
     payload: Dict[str, Any] = Field(default_factory=dict)
-

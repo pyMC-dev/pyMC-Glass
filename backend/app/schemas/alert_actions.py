@@ -73,6 +73,7 @@ class PushoverIntegrationSettings(BaseModel):
     priority: int = Field(default=0, ge=-2, le=2)
     sound: str | None = Field(default=None, max_length=64)
 
+
 class AppriseIntegrationSettings(BaseModel):
     api_url: AnyHttpUrl
     urls: list[str] = Field(default_factory=list)

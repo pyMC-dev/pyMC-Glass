@@ -9,6 +9,9 @@
       </div>
       <div class="header-actions">
         <router-link to="/repeaters" class="btn btn-secondary">Back to inventory</router-link>
+        <button class="btn btn-secondary" :disabled="!detail" @click="openRepeaterUi">
+          Open Repeater
+        </button>
         <button
           class="btn btn-primary"
           :disabled="loading || renewCertLoading || !canOperate"
@@ -22,6 +25,13 @@
           @click="queueConfigSnapshotBackup"
         >
           {{ snapshotQueueLoading ? "Queueing backup..." : "Queue Config Backup" }}
+        </button>
+        <button
+          class="btn btn-secondary"
+          :disabled="loading || transportKeysLoading || !detail || !canOperate"
+          @click="queueTransportKeySync"
+        >
+          {{ transportKeysLoading ? "Queueing keys..." : "Sync Transport Keys" }}
         </button>
         <button class="btn btn-secondary" :disabled="loading" @click="loadDetail()">
           {{ loading ? "Loading..." : "Refresh detail" }}
@@ -48,6 +58,41 @@
           :subtitle="`latest: ${latestLiveEvent ? formatTimestamp(latestLiveEvent.ingested_at) : '—'}`"
         />
       </section>
+
+      <article class="glass-card panel">
+        <h2>Open Repeater Button</h2>
+        <p class="section-subtitle">
+          This only changes the browser URL used by the Open Repeater button. It does not change
+          the inform/control IP that Glass uses to receive heartbeats or queue commands.
+        </p>
+        <form class="panel-form" @submit.prevent="saveOpenUrlOverride">
+          <label class="field-label">
+            Open URL override
+            <input
+              v-model.trim="openUrlForm"
+              class="field"
+              :disabled="!canOperate || openUrlSaving"
+              placeholder="100.x.y.z:8000 or http://yc-work-repeater:8000"
+            />
+          </label>
+          <p class="section-subtitle">
+            Current button target: <code>{{ currentOpenRepeaterUrl }}</code>
+          </p>
+          <div class="inline-controls">
+            <button class="btn btn-primary" :disabled="!canOperate || openUrlSaving">
+              {{ openUrlSaving ? "Saving..." : "Save Open URL" }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              :disabled="!canOperate || openUrlSaving || !detail.open_url"
+              @click="clearOpenUrlOverride"
+            >
+              Clear override
+            </button>
+          </div>
+        </form>
+      </article>
 
       <section class="grid-3">
         <article class="glass-card panel">
@@ -132,6 +177,43 @@
             <div class="metric-item">
               <span>Dropped</span>
               <strong>{{ formatInt(fieldNumber(detail.counters, "dropped")) }}</strong>
+            </div>
+          </div>
+          <div class="sensor-section">
+            <h3>Sensor Readings</h3>
+            <p v-if="sensorReadings.length === 0" class="section-subtitle">
+              No sensor readings reported yet. Glass is ready to accept repeater-provided sensor summaries.
+            </p>
+            <div v-else class="sensor-grid">
+              <div v-for="sensor in sensorReadings" :key="sensor.key" class="sensor-card">
+                <div class="sensor-title-row">
+                  <strong>{{ sensor.name }}</strong>
+                  <span class="sensor-type">{{ sensor.type }}</span>
+                </div>
+                <p class="section-subtitle">{{ sensor.ok ? "OK" : sensor.error || "Error" }} · {{ sensor.timestamp || "no timestamp" }}</p>
+                <div class="metric-grid compact-metrics">
+                  <div
+                    v-for="metric in sensor.metrics"
+                    :key="metric.key"
+                    class="metric-item"
+                    :class="{ 'metric-group': metric.children?.length }"
+                  >
+                    <template v-if="metric.children?.length">
+                      <span>{{ metric.label }}</span>
+                      <div class="nested-metrics">
+                        <div v-for="child in metric.children" :key="child.key" class="nested-metric">
+                          <span>{{ child.label }}</span>
+                          <strong>{{ child.value }}</strong>
+                        </div>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <span>{{ metric.label }}</span>
+                      <strong>{{ metric.value }}</strong>
+                    </template>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </article>
@@ -263,6 +345,7 @@ import {
   listConfigSnapshots,
   queueCommand,
   queueConfigSnapshotExport,
+  updateRepeater,
 } from "../api";
 import {
   appState,
@@ -278,6 +361,7 @@ import type {
   RepeaterCertDiagnosticLogResponse,
   RepeaterDetailResponse,
 } from "../types";
+import { repeaterUiUrl } from "../utils/repeaterUi";
 
 interface SeriesPoint {
   timestamp: string;
@@ -289,6 +373,23 @@ interface GaugeMetric {
   label: string;
   value: number | null;
   color: string;
+}
+
+interface SensorMetric {
+  key: string;
+  label: string;
+  value?: string;
+  children?: SensorMetric[];
+}
+
+interface SensorReadingDisplay {
+  key: string;
+  name: string;
+  type: string;
+  ok: boolean;
+  timestamp: string | null;
+  error: string | null;
+  metrics: SensorMetric[];
 }
 
 function diagnosticRowKey(entry: RepeaterCertDiagnosticLogResponse, index: number): string {
@@ -315,6 +416,9 @@ const renewCertLoading = ref(false);
 const expandedDiagnosticRows = ref<string[]>([]);
 const snapshotLoading = ref(false);
 const snapshotQueueLoading = ref(false);
+const transportKeysLoading = ref(false);
+const openUrlSaving = ref(false);
+const openUrlForm = ref("");
 const snapshotErrorMessage = ref<string | null>(null);
 const configSnapshots = ref<ConfigSnapshotResponse[]>([]);
 const expandedSnapshotRows = ref<string[]>([]);
@@ -339,6 +443,7 @@ const certDiagnostics = computed<RepeaterCertDiagnosticLogResponse[]>(
   () => detail.value?.cert_diagnostics || [],
 );
 const latestSnapshotKeyId = computed(() => configSnapshots.value[0]?.encryption_key_id || null);
+const currentOpenRepeaterUrl = computed(() => (detail.value ? repeaterUiUrl(detail.value) : "—"));
 
 const latestLivePayloadText = computed(() => {
   if (!latestLiveEvent.value) {
@@ -441,6 +546,12 @@ const systemGaugeMetrics = computed<GaugeMetric[]>(() => [
   },
 ]);
 
+const sensorReadings = computed<SensorReadingDisplay[]>(() => {
+  const sensors = detail.value?.system?.sensors;
+  const readings = extractSensorReadings(sensors);
+  return readings.map((reading, index) => toSensorDisplay(reading, index));
+});
+
 watch(repeaterId, () => {
   void loadDetail();
 });
@@ -460,6 +571,7 @@ async function loadDetail(): Promise<void> {
       snapshot_limit: 360,
       cert_log_limit: 40,
     });
+    openUrlForm.value = detail.value.open_url || "";
     expandedDiagnosticRows.value = [];
     await loadConfigSnapshots(detail.value.id);
   } catch (error) {
@@ -471,6 +583,32 @@ async function loadDetail(): Promise<void> {
   } finally {
     loading.value = false;
   }
+}
+
+async function saveOpenUrlOverride(): Promise<void> {
+  if (!appState.token || !detail.value || !canOperate.value) {
+    return;
+  }
+  openUrlSaving.value = true;
+  try {
+    const openUrl = openUrlForm.value.trim() || null;
+    const updated = await updateRepeater(appState.token, detail.value.id, { open_url: openUrl });
+    detail.value = { ...detail.value, ...updated };
+    appState.repeaters = appState.repeaters.map((repeater) =>
+      repeater.id === updated.id ? { ...repeater, ...updated } : repeater,
+    );
+    openUrlForm.value = detail.value.open_url || "";
+    showSuccessToast(openUrl ? "Open Repeater URL saved." : "Open Repeater URL override cleared.");
+  } catch (error) {
+    showErrorToast(error);
+  } finally {
+    openUrlSaving.value = false;
+  }
+}
+
+async function clearOpenUrlOverride(): Promise<void> {
+  openUrlForm.value = "";
+  await saveOpenUrlOverride();
 }
 
 async function queueCertRenewal(): Promise<void> {
@@ -602,6 +740,32 @@ async function queueConfigSnapshotBackup(): Promise<void> {
   }
 }
 
+function openRepeaterUi(): void {
+  if (!detail.value) return;
+  window.open(repeaterUiUrl(detail.value), "_blank", "noopener,noreferrer");
+}
+
+async function queueTransportKeySync(): Promise<void> {
+  if (!appState.token || !detail.value || !canOperate.value) {
+    return;
+  }
+  transportKeysLoading.value = true;
+  try {
+    await queueCommand(appState.token, {
+      node_name: detail.value.node_name,
+      action: "transport_keys_sync",
+      params: {},
+      requested_by: appState.user?.email || "operator",
+      reason: "Manual transport key sync requested from repeater detail view",
+    });
+    showSuccessToast("Transport key sync command queued for this repeater.");
+  } catch (error) {
+    showErrorToast(error);
+  } finally {
+    transportKeysLoading.value = false;
+  }
+}
+
 function numberFrom(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -620,6 +784,143 @@ function fieldNumber(source: Record<string, unknown> | null | undefined, key: st
     return null;
   }
   return numberFrom(source[key]);
+}
+
+function extractSensorReadings(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) {
+    return value.filter(isRecord);
+  }
+  if (!isRecord(value)) {
+    return [];
+  }
+  const readings = value.readings;
+  if (Array.isArray(readings)) {
+    return readings.filter(isRecord);
+  }
+  return [];
+}
+
+function toSensorDisplay(reading: Record<string, unknown>, index: number): SensorReadingDisplay {
+  const data = isRecord(reading.data) ? reading.data : {};
+  return {
+    key: `${String(reading.name || "sensor")}-${index}`,
+    name: String(reading.name || `Sensor ${index + 1}`),
+    type: String(reading.type || "sensor"),
+    ok: reading.ok !== false,
+    timestamp: typeof reading.timestamp === "string" ? reading.timestamp : null,
+    error: typeof reading.error === "string" ? reading.error : null,
+    metrics: Object.entries(data).map(([key, rawValue]) => toSensorMetric(key, rawValue)),
+  };
+}
+
+function toSensorMetric(key: string, rawValue: unknown): SensorMetric {
+  if (isRecord(rawValue)) {
+    return {
+      key,
+      label: humanizeKey(key),
+      children: flattenSensorChildren(rawValue, key),
+    };
+  }
+  if (Array.isArray(rawValue)) {
+    return {
+      key,
+      label: humanizeKey(key),
+      value: rawValue.map((item) => formatSensorValue(item, key)).join(", ") || "—",
+    };
+  }
+  return {
+    key,
+    label: humanizeKey(key),
+    value: formatSensorValue(rawValue, key),
+  };
+}
+
+function flattenSensorChildren(record: Record<string, unknown>, parentKey: string): SensorMetric[] {
+  const metrics: SensorMetric[] = [];
+  for (const [childKey, childValue] of Object.entries(record)) {
+    const fullKey = `${parentKey}.${childKey}`;
+    if (isRecord(childValue)) {
+      metrics.push(...flattenSensorChildren(childValue, fullKey));
+      continue;
+    }
+    metrics.push({
+      key: fullKey,
+      label: humanizeKey(childKey),
+      value: Array.isArray(childValue)
+        ? childValue.map((item) => formatSensorValue(item, fullKey)).join(", ") || "—"
+        : formatSensorValue(childValue, fullKey),
+    });
+  }
+  return metrics;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function humanizeKey(value: string): string {
+  return value.replace(/[_.]/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatSensorValue(value: unknown, key = ""): string {
+  if (typeof value === "number") {
+    const normalizedKey = key.toLowerCase().split(".").pop() || key.toLowerCase();
+    if (normalizedKey.includes("percent") || normalizedKey.endsWith("pct")) {
+      return `${value.toFixed(1)}%`;
+    }
+    if (
+      normalizedKey.includes("bytes") ||
+      ["free", "used", "total", "available"].includes(normalizedKey)
+    ) {
+      return formatBytes(value);
+    }
+    if (normalizedKey.includes("uptime")) {
+      return formatUptime(value);
+    }
+    if (normalizedKey.includes("boot_time")) {
+      return formatTimestamp(new Date(value * 1000).toISOString());
+    }
+    if (
+      normalizedKey.includes("temperature") ||
+      normalizedKey.startsWith("coretemp") ||
+      normalizedKey.startsWith("nvme")
+    ) {
+      return formatTemp(value);
+    }
+    if (normalizedKey.includes("voltage_v")) {
+      return `${value.toFixed(3)} V`;
+    }
+    if (normalizedKey.includes("voltage_mv")) {
+      return `${value.toFixed(0)} mV`;
+    }
+    if (normalizedKey.includes("current_ma")) {
+      return `${value.toFixed(1)} mA`;
+    }
+    if (normalizedKey.includes("power_mw")) {
+      return `${value.toFixed(1)} mW`;
+    }
+    if (normalizedKey.includes("power_w")) {
+      return `${value.toFixed(2)} W`;
+    }
+    if (normalizedKey.includes("frequency")) {
+      return `${value.toFixed(0)} MHz`;
+    }
+    return Number.isInteger(value) ? String(value) : value.toFixed(2);
+  }
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+  if (value === null || value === undefined) {
+    return "—";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 }
 
 function sortSeries(points: SeriesPoint[]): SeriesPoint[] {
@@ -889,6 +1190,82 @@ function diagnosticSeverityClass(severity: string): string {
 
 .metric-item strong {
   font-size: 0.94rem;
+}
+
+.sensor-section {
+  margin-top: 1rem;
+}
+
+.sensor-section h3 {
+  margin: 0 0 0.45rem;
+  font-size: 1rem;
+}
+
+.sensor-grid {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.sensor-card {
+  border: 1px solid rgba(173, 193, 222, 0.22);
+  border-radius: 10px;
+  padding: 0.75rem;
+  background: color-mix(in srgb, var(--color-surface) 76%, var(--color-background-mute) 24%);
+}
+
+.sensor-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sensor-type {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.compact-metrics {
+  margin-top: 0.55rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.metric-group {
+  grid-column: 1 / -1;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.nested-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.45rem;
+  width: 100%;
+}
+
+.nested-metric {
+  display: grid;
+  gap: 0.16rem;
+  min-width: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(173, 193, 222, 0.14);
+  background: color-mix(in srgb, var(--color-background-mute) 72%, transparent);
+  padding: 0.45rem;
+}
+
+.nested-metric span {
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.nested-metric strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
 }
 
 .json-block {

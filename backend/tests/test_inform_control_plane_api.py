@@ -1,8 +1,11 @@
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
+from typing import Any, cast
 
-from sqlalchemy import select
+from app.api.routes.inform import _inform_source_ip
 from app.db.models import ConfigSnapshot
 from app.db.session import get_session_factory
+from sqlalchemy import select
 
 
 def _bootstrap_admin(client) -> None:
@@ -62,6 +65,56 @@ def _inform_payload(node_name: str) -> dict:
     }
 
 
+def test_inform_source_ip_preserves_good_ip_when_docker_gateway_reports() -> None:
+    docker_gateway_request = cast(
+        Any,
+        SimpleNamespace(client=SimpleNamespace(host="172.18.0.1")),
+    )
+    real_lan_request = cast(Any, SimpleNamespace(client=SimpleNamespace(host="192.168.20.42")))
+
+    assert _inform_source_ip(docker_gateway_request, "192.168.20.10") == "192.168.20.10"
+    assert _inform_source_ip(docker_gateway_request, None) == "172.18.0.1"
+    assert _inform_source_ip(real_lan_request, "172.18.0.1") == "192.168.20.42"
+
+
+def test_repeater_open_url_override_is_separate_from_inform_ip(client) -> None:
+    _bootstrap_admin(client)
+    token = _login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    payload = _inform_payload("YC-Work-Repeater")
+    first_inform = client.post("/inform", json=payload)
+    assert first_inform.status_code == 200
+
+    pending = client.get("/api/adoption/pending", headers=headers)
+    assert pending.status_code == 200
+    repeater = pending.json()[0]
+    original_inform_ip = repeater["inform_ip"]
+
+    updated = client.patch(
+        f"/api/repeaters/{repeater['id']}",
+        json={"open_url": " 100.64.12.34:8000 "},
+        headers=headers,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["open_url"] == "100.64.12.34:8000"
+    assert updated.json()["inform_ip"] == original_inform_ip
+
+    detail = client.get(f"/api/repeaters/{repeater['id']}/detail", headers=headers)
+    assert detail.status_code == 200
+    assert detail.json()["open_url"] == "100.64.12.34:8000"
+    assert detail.json()["inform_ip"] == original_inform_ip
+
+    cleared = client.patch(
+        f"/api/repeaters/{repeater['id']}",
+        json={"open_url": ""},
+        headers=headers,
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["open_url"] is None
+    assert cleared.json()["inform_ip"] == original_inform_ip
+
+
 def test_inform_persists_location_and_settings_for_detail(client) -> None:
     _bootstrap_admin(client)
     token = _login(client)
@@ -90,6 +143,43 @@ def test_inform_persists_location_and_settings_for_detail(client) -> None:
     assert detail.json()["location"] == "51.507400,-0.127800"
     assert detail.json()["settings"]["repeater"]["mode"] == "forward"
     assert detail.json()["state"] == "forward"
+
+
+def test_inform_accepts_pre_staged_sensor_readings(client) -> None:
+    _bootstrap_admin(client)
+    token = _login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    payload = _inform_payload("mesh-repeater-sensors")
+    payload["sensors"] = {
+        "enabled": True,
+        "configured": 2,
+        "loaded": 2,
+        "running": True,
+        "readings": [
+            {
+                "name": "ups-main",
+                "type": "waveshare_ups_d",
+                "ok": True,
+                "timestamp": "2026-06-20T12:00:00Z",
+                "data": {"battery_percent": 87.5, "voltage_v": 4.08, "current_ma": 120.0},
+            }
+        ],
+    }
+
+    first_inform = client.post("/inform", json=payload)
+    assert first_inform.status_code == 200
+
+    pending = client.get("/api/adoption/pending", headers=headers)
+    assert pending.status_code == 200
+    repeater_id = pending.json()[0]["id"]
+
+    detail = client.get(f"/api/repeaters/{repeater_id}/detail", headers=headers)
+    assert detail.status_code == 200
+    sensors = detail.json()["system"]["sensors"]
+    assert sensors["loaded"] == 2
+    assert sensors["readings"][0]["type"] == "waveshare_ups_d"
+    assert sensors["readings"][0]["data"]["battery_percent"] == 87.5
 
 
 def test_inform_extracts_location_from_repeater_latitude_longitude(client) -> None:
@@ -273,6 +363,78 @@ def test_inform_to_adoption_and_command_lifecycle(client) -> None:
     sources = {entry["source"] for entry in diagnostics}
     assert "certificate_issued" in sources
     assert "command_queue" in sources
+
+
+def test_policy_sync_updates_runtime_policy_status(client) -> None:
+    _bootstrap_admin(client)
+    token = _login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    node_name = "mesh-repeater-policy-sync"
+
+    first_inform = client.post("/inform", json=_inform_payload(node_name))
+    assert first_inform.status_code == 200
+    pending = client.get("/api/adoption/pending", headers=headers)
+    repeater_id = pending.json()[0]["id"]
+    adopt = client.post(
+        f"/api/adoption/{repeater_id}/adopt",
+        json={"note": "approved"},
+        headers=headers,
+    )
+    assert adopt.status_code == 200
+
+    policy = {"enabled": True, "default_action": "allow", "rules": [], "objects": {}}
+    template = client.post(
+        "/api/repeater-policies/templates",
+        json={"name": "No-op test policy", "enabled": True, "policy": policy},
+        headers=headers,
+    )
+    assert template.status_code == 201
+    sync = client.post(
+        "/api/repeater-policies/sync",
+        json={
+            "template_id": template.json()["id"],
+            "repeater_ids": [repeater_id],
+            "mode": "replace",
+        },
+        headers=headers,
+    )
+    assert sync.status_code == 200
+    command_id = sync.json()["command_ids"][0]
+
+    cert_response = client.post("/inform", json=_inform_payload(node_name))
+    assert cert_response.status_code == 200
+    assert cert_response.json()["type"] == "cert_renewal"
+
+    dispatched = client.post("/inform", json=_inform_payload(node_name))
+    assert dispatched.status_code == 200
+    assert dispatched.json()["type"] == "command"
+    assert dispatched.json()["command_id"] == command_id
+    assert dispatched.json()["action"] == "policy_sync"
+
+    statuses = client.get("/api/repeater-policies/sync-status", headers=headers)
+    assert statuses.status_code == 200
+    assert statuses.json()[0]["status"] == "dispatched"
+    assert statuses.json()[0]["dispatched_at"] is not None
+
+    result_payload = _inform_payload(node_name)
+    result_payload["command_results"] = [
+        {
+            "command_id": command_id,
+            "status": "success",
+            "message": "Policy synchronized",
+            "completed_at": "2026-04-15T12:30:45Z",
+            "details": {"rule_count": 0, "enabled": True, "default_action": "allow"},
+        }
+    ]
+    completed = client.post("/inform", json=result_payload)
+    assert completed.status_code == 200
+
+    completed_statuses = client.get("/api/repeater-policies/sync-status", headers=headers)
+    assert completed_statuses.status_code == 200
+    body = completed_statuses.json()[0]
+    assert body["status"] == "success"
+    assert body["error_message"] is None
+    assert body["completed_at"] == "2026-04-15T12:30:45"
 
 
 def test_inform_renews_when_reported_cert_is_near_expiry(client) -> None:
@@ -514,9 +676,9 @@ def test_config_snapshot_export_ingest_encrypted_and_rotates(client) -> None:
                 "command_id": command_id,
                 "status": "success",
                 "message": "config exported",
-                "completed_at": (
-                    datetime.now(UTC) + timedelta(seconds=idx)
-                ).isoformat().replace("+00:00", "Z"),
+                "completed_at": (datetime.now(UTC) + timedelta(seconds=idx))
+                .isoformat()
+                .replace("+00:00", "Z"),
                 "details": {
                     "config": {
                         "repeater": {"node_name": node_name},
@@ -655,8 +817,7 @@ def test_config_snapshot_request_logs_and_change_control_dedup(client) -> None:
     assert detail.status_code == 200
     diagnostics = detail.json().get("cert_diagnostics", [])
     assert any(
-        entry.get("source") == "config_snapshot_request"
-        and reason in str(entry.get("message", ""))
+        entry.get("source") == "config_snapshot_request" and reason in str(entry.get("message", ""))
         for entry in diagnostics
     )
     assert any(

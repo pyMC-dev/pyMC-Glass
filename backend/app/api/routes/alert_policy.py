@@ -187,9 +187,14 @@ def update_node_group(
             status_code=status.HTTP_409_CONFLICT,
             detail="Node group already exists",
         ) from exc
-    member_count = db.scalar(
-        select(func.count(NodeGroupMembership.id)).where(NodeGroupMembership.group_id == group.id)
-    ) or 0
+    member_count = (
+        db.scalar(
+            select(func.count(NodeGroupMembership.id)).where(
+                NodeGroupMembership.group_id == group.id
+            )
+        )
+        or 0
+    )
     write_audit_log(
         db,
         action="node_group_updated",
@@ -294,11 +299,15 @@ def list_policy_templates(
     db: Session = Depends(get_db_session),
     _: User = Depends(require_roles("admin", "operator", "viewer")),
 ) -> list[AlertPolicyTemplateResponse]:
-    templates = db.scalars(select(AlertPolicyTemplate).order_by(AlertPolicyTemplate.name.asc())).all()
+    templates = db.scalars(
+        select(AlertPolicyTemplate).order_by(AlertPolicyTemplate.name.asc())
+    ).all()
     return [_to_template_response(item) for item in templates]
 
 
-@router.post("/templates", response_model=AlertPolicyTemplateResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/templates", response_model=AlertPolicyTemplateResponse, status_code=status.HTTP_201_CREATED
+)
 def create_policy_template(
     payload: AlertPolicyTemplateCreateRequest,
     db: Session = Depends(get_db_session),
@@ -348,7 +357,9 @@ def update_policy_template(
 ) -> AlertPolicyTemplateResponse:
     template = db.scalar(select(AlertPolicyTemplate).where(AlertPolicyTemplate.id == template_id))
     if template is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert policy template not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Alert policy template not found"
+        )
     changes = payload.model_dump(exclude_unset=True)
     if "name" in changes and changes["name"] is not None:
         template.name = str(changes.pop("name")).strip()
@@ -398,7 +409,9 @@ def delete_policy_template(
 ) -> None:
     template = db.scalar(select(AlertPolicyTemplate).where(AlertPolicyTemplate.id == template_id))
     if template is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert policy template not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Alert policy template not found"
+        )
     template_name = template.name
     db.delete(template)
     write_audit_log(
@@ -448,15 +461,23 @@ def list_policy_assignments(
     ]
 
 
-@router.post("/assignments", response_model=AlertPolicyAssignmentResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/assignments",
+    response_model=AlertPolicyAssignmentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_policy_assignment(
     payload: AlertPolicyAssignmentCreateRequest,
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles("admin", "operator")),
 ) -> AlertPolicyAssignmentResponse:
-    template = db.scalar(select(AlertPolicyTemplate).where(AlertPolicyTemplate.id == payload.template_id))
+    template = db.scalar(
+        select(AlertPolicyTemplate).where(AlertPolicyTemplate.id == payload.template_id)
+    )
     if template is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert policy template not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Alert policy template not found"
+        )
     if payload.scope_type == "global":
         scope_id = None
     else:
@@ -469,7 +490,9 @@ def create_policy_assignment(
     if payload.scope_type == "group":
         group = db.scalar(select(NodeGroup).where(NodeGroup.id == scope_id))
         if group is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Node group not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Node group not found"
+            )
     if payload.scope_type == "node":
         repeater = db.scalar(select(Repeater).where(Repeater.id == scope_id))
         if repeater is None:
@@ -538,7 +561,9 @@ def update_policy_assignment(
         .where(AlertPolicyAssignment.id == assignment_id)
     ).first()
     if row is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert policy assignment not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Alert policy assignment not found"
+        )
     assignment, template = row
     changes = payload.model_dump(exclude_unset=True)
     if "priority" in changes and changes["priority"] is not None:
@@ -580,9 +605,13 @@ def delete_policy_assignment(
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles("admin", "operator")),
 ) -> None:
-    assignment = db.scalar(select(AlertPolicyAssignment).where(AlertPolicyAssignment.id == assignment_id))
+    assignment = db.scalar(
+        select(AlertPolicyAssignment).where(AlertPolicyAssignment.id == assignment_id)
+    )
     if assignment is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert policy assignment not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Alert policy assignment not found"
+        )
     db.delete(assignment)
     write_audit_log(
         db,
@@ -679,7 +708,9 @@ def bootstrap_default_policy_templates(
         },
         {
             "name": "Default TLS Telemetry Stale",
-            "description": "Triggers when inform and MQTT telemetry are stale while MQTT TLS is enabled.",
+            "description": (
+                "Triggers when inform and MQTT telemetry are stale while MQTT TLS is enabled."
+            ),
             "rule_type": "tls_telemetry_stale",
             "severity": "warning",
             "enabled": 1,
@@ -754,7 +785,9 @@ def bootstrap_default_policy_templates(
         },
         {
             "name": "Default High Drop Rate",
-            "description": "Triggers when packet drop rate exceeds threshold in the evaluation window.",
+            "description": (
+                "Triggers when packet drop rate exceeds threshold in the evaluation window."
+            ),
             "rule_type": "high_drop_rate",
             "severity": "warning",
             "enabled": 1,
@@ -765,7 +798,10 @@ def bootstrap_default_policy_templates(
         },
         {
             "name": "Default New Zero-Hop Node Detected",
-            "description": "Triggers when a newly discovered node is observed via zero-hop advert in the policy window.",
+            "description": (
+                "Triggers when a newly discovered node is observed via zero-hop advert in "
+                "the policy window."
+            ),
             "rule_type": "new_zero_hop_node_detected",
             "severity": "info",
             "enabled": 1,

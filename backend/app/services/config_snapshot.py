@@ -31,6 +31,7 @@ class SnapshotStoreResult:
     stored_new_snapshot: bool
     change_control: dict[str, Any]
 
+
 def _split_encryption_key_entries(raw_value: str | None) -> list[tuple[str, str]]:
     if not raw_value:
         return []
@@ -82,9 +83,7 @@ class ConfigSnapshotService:
     def __init__(self, settings: Settings, *, encryption_keys: str | None = None):
         self.settings = settings
         raw_keys = (
-            settings.config_snapshot_encryption_keys
-            if encryption_keys is None
-            else encryption_keys
+            settings.config_snapshot_encryption_keys if encryption_keys is None else encryption_keys
         )
         self._keys = parse_config_snapshot_encryption_keys(raw_keys)
         self._decryptors = {key_id: fernet for key_id, fernet in self._keys}
@@ -92,7 +91,6 @@ class ConfigSnapshotService:
     @property
     def configured(self) -> bool:
         return bool(self._keys)
-
 
     @staticmethod
     def extract_export_payload(details: dict[str, Any]) -> dict[str, Any]:
@@ -250,9 +248,7 @@ class ConfigSnapshotService:
         payload: dict[str, Any],
     ) -> SnapshotStoreResult:
         if not self._keys:
-            raise SnapshotEncryptionError(
-                "Config snapshot encryption keys are not configured."
-            )
+            raise SnapshotEncryptionError("Config snapshot encryption keys are not configured.")
         if not isinstance(payload, dict) or not payload:
             raise SnapshotPayloadError("Snapshot payload must be a non-empty object.")
 
@@ -373,9 +369,7 @@ class ConfigSnapshotService:
 
     def decrypt_snapshot_payload(self, snapshot: ConfigSnapshot) -> dict[str, Any]:
         if not self._decryptors:
-            raise SnapshotEncryptionError(
-                "Config snapshot encryption keys are not configured."
-            )
+            raise SnapshotEncryptionError("Config snapshot encryption keys are not configured.")
 
         ciphertext = snapshot.ciphertext.encode("utf-8")
         attempted: list[Fernet] = []

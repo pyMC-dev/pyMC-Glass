@@ -12,4 +12,3 @@ class AuditRecordResponse(BaseModel):
     target_type: str | None
     target_id: str | None
     details: dict[str, Any]
-

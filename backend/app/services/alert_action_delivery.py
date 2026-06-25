@@ -180,9 +180,7 @@ def _render_action_payload(
     body = render_template_text(action_template.body_template, context)
     payload_template = parse_action_template_payload(action_template)
     rendered_payload_value = (
-        render_template_value(payload_template, context)
-        if payload_template is not None
-        else {}
+        render_template_value(payload_template, context) if payload_template is not None else {}
     )
     rendered_payload: dict[str, Any]
     if isinstance(rendered_payload_value, dict):
@@ -217,9 +215,7 @@ def render_action_template_preview(
     title = render_template_text(title_template, context)
     body = render_template_text(body_template, context)
     rendered_payload_value = (
-        render_template_value(payload_template, context)
-        if payload_template is not None
-        else {}
+        render_template_value(payload_template, context) if payload_template is not None else {}
     )
     payload: dict[str, Any]
     if isinstance(rendered_payload_value, dict):
@@ -315,9 +311,7 @@ def enqueue_policy_action_notifications(
             )
         )
         action_template = db.scalar(
-            select(AlertActionTemplate).where(
-                AlertActionTemplate.id == binding.action_template_id
-            )
+            select(AlertActionTemplate).where(AlertActionTemplate.id == binding.action_template_id)
         )
         if integration is None or action_template is None:
             continue
@@ -343,9 +337,7 @@ def enqueue_policy_action_notifications(
             f"{alert.id}:{binding.id}:{normalized_event_type}:{transition_key.strip()}"
         )
         existing = db.scalar(
-            select(NotificationEvent.id).where(
-                NotificationEvent.idempotency_key == idempotency_key
-            )
+            select(NotificationEvent.id).where(NotificationEvent.idempotency_key == idempotency_key)
         )
         if existing is not None:
             continue
@@ -381,9 +373,7 @@ def enqueue_policy_action_notifications(
                 binding_id=binding.id,
                 provider_type=integration.provider_type,
                 idempotency_key=idempotency_key,
-                rendered_payload={
-                    "template_error": f"Missing template variable: {missing_token}"
-                },
+                rendered_payload={"template_error": f"Missing template variable: {missing_token}"},
             )
             event.status = "failed"
             event.last_error = f"Template rendering failed: missing variable '{missing_token}'"
@@ -591,4 +581,3 @@ def run_action_dispatch_batch(
             provider_message_id=send_result.provider_message_id,
         )
     return processed
-

@@ -54,13 +54,9 @@ def render_template_value(value: Any, context: Mapping[str, Any]) -> Any:
     if isinstance(value, str):
         return render_template_text(value, context)
     if isinstance(value, dict):
-        return {
-            str(key): render_template_value(item, context)
-            for key, item in value.items()
-        }
+        return {str(key): render_template_value(item, context) for key, item in value.items()}
     if isinstance(value, list):
         return [render_template_value(item, context) for item in value]
     if isinstance(value, tuple):
         return [render_template_value(item, context) for item in value]
     return _json_safe_value(value)
-

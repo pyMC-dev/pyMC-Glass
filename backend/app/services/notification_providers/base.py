@@ -35,16 +35,13 @@ class NotificationProviderCapability:
 class NotificationProvider(Protocol):
     capability: NotificationProviderCapability
 
-    def validate_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
-        ...
+    def validate_settings(self, settings: dict[str, Any]) -> dict[str, Any]: ...
 
-    def build_payload(self, request: NotificationSendRequest) -> dict[str, Any]:
-        ...
+    def build_payload(self, request: NotificationSendRequest) -> dict[str, Any]: ...
 
     def send(
         self,
         *,
         settings: dict[str, Any],
         request: NotificationSendRequest,
-    ) -> NotificationSendResult:
-        ...
+    ) -> NotificationSendResult: ...

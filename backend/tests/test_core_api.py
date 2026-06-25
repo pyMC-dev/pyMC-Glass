@@ -1,8 +1,8 @@
-from app.config import get_settings
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from app.config import get_settings
 from app.db.models import Alert, InformSnapshot, Packet, Repeater
 from app.db.session import get_session_factory
 from cryptography import x509
@@ -372,6 +372,7 @@ def test_managed_mqtt_settings_update_and_queue_to_repeaters(client) -> None:
             "mqtt_broker_port": 2883,
             "mqtt_base_topic": "glass-prod",
             "mqtt_tls_enabled": True,
+            "mqtt_broker_additional_hosts": ["100.64.0.10", "glass.example.com"],
             "queue_to_repeaters": True,
             "reason": "fix broker host",
         },
@@ -381,12 +382,20 @@ def test_managed_mqtt_settings_update_and_queue_to_repeaters(client) -> None:
     assert update.json()["queued_commands"] == 2
     assert update.json()["settings"]["mqtt_broker_host"] == "mqtt.internal.example"
     assert update.json()["settings"]["mqtt_base_topic"] == "glass-prod"
+    assert update.json()["settings"]["mqtt_broker_additional_hosts"] == [
+        "100.64.0.10",
+        "glass.example.com",
+    ]
 
     loaded = client.get("/api/system-settings/mqtt-managed", headers=headers)
     assert loaded.status_code == 200
     assert loaded.json()["mqtt_broker_host"] == "mqtt.internal.example"
     assert loaded.json()["mqtt_broker_port"] == 2883
     assert loaded.json()["mqtt_tls_enabled"] is True
+    assert loaded.json()["mqtt_broker_additional_hosts"] == [
+        "100.64.0.10",
+        "glass.example.com",
+    ]
     assert loaded.json()["source"] == "override"
 
     settings = get_settings()
@@ -394,7 +403,10 @@ def test_managed_mqtt_settings_update_and_queue_to_repeaters(client) -> None:
     cert = x509.load_pem_x509_certificate(broker_cert_path.read_bytes())
     san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
     dns_names = set(san.get_values_for_type(x509.DNSName))
+    ip_names = {str(name) for name in san.get_values_for_type(x509.IPAddress)}
     assert "mqtt.internal.example" in dns_names
+    assert "glass.example.com" in dns_names
+    assert "100.64.0.10" in ip_names
 
     commands = client.get("/api/commands?limit=20", headers=headers)
     assert commands.status_code == 200
@@ -406,6 +418,94 @@ def test_managed_mqtt_settings_update_and_queue_to_repeaters(client) -> None:
         == "mqtt.internal.example"
     ]
     assert len(managed_commands) == 2
+    assert (
+        "mqtt_broker_additional_hosts"
+        not in managed_commands[0]["params"]["config"]["glass_managed"]
+    )
+
+
+def test_repeater_policy_template_validate_and_sync(client) -> None:
+    _bootstrap_admin(client)
+    token = _login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    connected = client.post(
+        "/api/repeaters",
+        json={
+            "node_name": "policy-node-1",
+            "pubkey": "0x" + "E1" * 32,
+            "status": "connected",
+            "firmware_version": "1.0.0",
+        },
+        headers=headers,
+    )
+    pending = client.post(
+        "/api/repeaters",
+        json={
+            "node_name": "policy-node-pending",
+            "pubkey": "0x" + "E2" * 32,
+            "status": "pending_adoption",
+            "firmware_version": "1.0.0",
+        },
+        headers=headers,
+    )
+    assert connected.status_code == 201
+    assert pending.status_code == 201
+
+    policy = {
+        "enabled": True,
+        "default_action": "allow",
+        "rules": [
+            {
+                "name": "Drop blocked channel text",
+                "if": {
+                    "all": [{"field": "channel_message_body", "op": "contains", "value": "blocked"}]
+                },
+                "then": {"action": "drop"},
+            }
+        ],
+        "objects": {"channel_hash_groups": {"blocked": ["0x12"]}},
+    }
+    validation = client.post(
+        "/api/repeater-policies/validate", json={"policy": policy}, headers=headers
+    )
+    assert validation.status_code == 200
+    assert validation.json()["valid"] is True
+    assert validation.json()["normalized_policy"]["rules"][0]["then"]["action"] == "drop"
+
+    created = client.post(
+        "/api/repeater-policies/templates",
+        json={
+            "name": "Drop blocked",
+            "description": "packet policy",
+            "enabled": True,
+            "policy": policy,
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201
+    template_id = created.json()["id"]
+
+    synced = client.post(
+        "/api/repeater-policies/sync",
+        json={"template_id": template_id, "all_repeaters": True, "mode": "replace"},
+        headers=headers,
+    )
+    assert synced.status_code == 200
+    assert synced.json()["queued_commands"] == 1
+    assert synced.json()["statuses"][0]["node_name"] == "policy-node-1"
+    assert synced.json()["statuses"][0]["status"] == "queued"
+
+    commands = client.get("/api/commands?limit=10", headers=headers)
+    assert commands.status_code == 200
+    policy_commands = [item for item in commands.json() if item["action"] == "policy_sync"]
+    assert len(policy_commands) == 1
+    assert policy_commands[0]["params"]["template_id"] == template_id
+    assert policy_commands[0]["params"]["policy"]["default_action"] == "allow"
+
+    statuses = client.get("/api/repeater-policies/sync-status", headers=headers)
+    assert statuses.status_code == 200
+    assert statuses.json()[0]["command_id"] == policy_commands[0]["command_id"]
 
 
 def test_packets_list_supports_filters(client) -> None:

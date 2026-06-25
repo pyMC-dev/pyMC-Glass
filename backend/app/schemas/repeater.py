@@ -16,6 +16,7 @@ class RepeaterUpdateRequest(BaseModel):
     status: str | None = Field(default=None, min_length=1, max_length=32)
     firmware_version: str | None = Field(default=None, max_length=64)
     location: str | None = Field(default=None, max_length=255)
+    open_url: str | None = Field(default=None, max_length=255)
     config_hash: str | None = Field(default=None, max_length=80)
     last_inform_at: datetime | None = None
 
@@ -28,6 +29,8 @@ class RepeaterResponse(BaseModel):
     firmware_version: str | None = None
     location: str | None = None
     config_hash: str | None = None
+    inform_ip: str | None = None
+    open_url: str | None = None
     last_inform_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
@@ -45,6 +48,7 @@ class InformSnapshotPointResponse(BaseModel):
     forwarded: int | None = None
     dropped: int | None = None
     airtime_percent: float | None = None
+
 
 class RepeaterCertDiagnosticLogResponse(BaseModel):
     timestamp: datetime
@@ -66,4 +70,3 @@ class RepeaterDetailResponse(RepeaterResponse):
 
 class DeleteStaleRepeatersResponse(BaseModel):
     removed: int
-

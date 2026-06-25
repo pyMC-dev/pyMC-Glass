@@ -24,4 +24,3 @@ def write_audit_log(
     )
     db.add(record)
     return record
-

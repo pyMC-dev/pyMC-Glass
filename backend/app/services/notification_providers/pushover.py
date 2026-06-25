@@ -1,6 +1,6 @@
 from __future__ import annotations
-import json
 
+import json
 from typing import Any
 from urllib import error as urllib_error
 from urllib import parse as urllib_parse
@@ -22,7 +22,7 @@ class PushoverNotificationProvider:
         supports_templated_payload=True,
     )
     _PUSHOVER_API_URL = "https://api.pushover.net/1/messages.json"
-    _USER_AGENT = "pyMC_Glass/alert-actions"
+    _USER_AGENT = "openHop Glass/alert-actions"
 
     def validate_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
         validated = PushoverIntegrationSettings.model_validate(settings)
@@ -163,6 +163,8 @@ class PushoverNotificationProvider:
                 error=f"Pushover request failed with HTTP {exc.code}",
             )
         except urllib_error.URLError as exc:
-            return NotificationSendResult(status="failed", error=f"Pushover request failed: {exc.reason}")
+            return NotificationSendResult(
+                status="failed", error=f"Pushover request failed: {exc.reason}"
+            )
         except TimeoutError:
             return NotificationSendResult(status="failed", error="Pushover request timed out")

@@ -118,8 +118,10 @@ def _settings_expect_mqtt_tls(settings: dict[str, Any]) -> bool:
     mqtt_settings = settings.get("mqtt")
     if isinstance(mqtt_settings, dict):
         tls = mqtt_settings.get("tls")
-        if bool(mqtt_settings.get("enabled")) and isinstance(tls, dict) and bool(
-            tls.get("enabled")
+        if (
+            bool(mqtt_settings.get("enabled"))
+            and isinstance(tls, dict)
+            and bool(tls.get("enabled"))
         ):
             return True
     return False
@@ -161,7 +163,9 @@ def list_effective_policies_for_repeater(
     group_ids = [membership.group_id for membership in membership_rows]
 
     filters = [
-        and_(AlertPolicyAssignment.scope_type == "global", AlertPolicyAssignment.scope_id.is_(None)),
+        and_(
+            AlertPolicyAssignment.scope_type == "global", AlertPolicyAssignment.scope_id.is_(None)
+        ),
         and_(
             AlertPolicyAssignment.scope_type == "node",
             AlertPolicyAssignment.scope_id == repeater.id,
@@ -416,7 +420,10 @@ def _evaluate_tls_telemetry_stale_policy(
 ) -> tuple[bool, str]:
     settings = _parse_config(repeater.settings_json)
     if not _settings_expect_mqtt_tls(settings):
-        return (False, "TLS telemetry health check skipped: repeater settings do not require MQTT TLS.")
+        return (
+            False,
+            "TLS telemetry health check skipped: repeater settings do not require MQTT TLS.",
+        )
 
     grace_seconds = policy.template.offline_grace_seconds or 600
     last_inform_at = _normalize_datetime(repeater.last_inform_at)
@@ -473,13 +480,15 @@ def _evaluate_tls_telemetry_stale_policy(
         return (
             True,
             (
-                f"Inform heartbeat is stale ({inform_age_seconds}s old) and MQTT telemetry is stale "
+                f"Inform heartbeat is stale ({inform_age_seconds}s old) and MQTT telemetry "
+                "is stale "
                 f"({telemetry_age_seconds}s old) after successful TLS configuration update; "
                 "certificate trust or mTLS handshake mismatch is likely."
             )
             if telemetry_age_seconds is not None
             else (
-                f"Inform heartbeat is stale ({inform_age_seconds}s old) and no MQTT telemetry has been "
+                f"Inform heartbeat is stale ({inform_age_seconds}s old) and no MQTT "
+                "telemetry has been "
                 "ingested after successful TLS configuration update; certificate trust or mTLS "
                 "handshake mismatch is likely."
             ),
@@ -488,8 +497,9 @@ def _evaluate_tls_telemetry_stale_policy(
     return (
         True,
         (
-            f"Inform heartbeat is stale ({inform_age_seconds}s old) and MQTT telemetry is stale "
-            f"({telemetry_age_seconds}s old) while TLS is enabled; investigate certificate and broker trust."
+            f"Inform heartbeat is stale ({inform_age_seconds}s old) and MQTT telemetry "
+            f"is stale ({telemetry_age_seconds}s old) while TLS is enabled; investigate "
+            "certificate and broker trust."
         )
         if telemetry_age_seconds is not None
         else (
@@ -503,7 +513,9 @@ def _evaluate_temperature_policy(
     repeater: Repeater,
     policy: EffectivePolicyItem,
 ) -> tuple[bool, str]:
-    threshold = policy.template.threshold_value if policy.template.threshold_value is not None else 80.0
+    threshold = (
+        policy.template.threshold_value if policy.template.threshold_value is not None else 80.0
+    )
     system_payload = _parse_system_json(repeater.system_json)
     raw_temperature = system_payload.get("temperature_c")
     if raw_temperature is None:
@@ -524,10 +536,17 @@ def _evaluate_drop_rate_policy(
     now: datetime,
 ) -> tuple[bool, str]:
     window_minutes = policy.template.window_minutes or 15
-    threshold = policy.template.threshold_value if policy.template.threshold_value is not None else 0.05
+    threshold = (
+        policy.template.threshold_value if policy.template.threshold_value is not None else 0.05
+    )
     window_start = now - timedelta(minutes=window_minutes)
     rows = db.execute(
-        select(InformSnapshot.timestamp, InformSnapshot.rx_total, InformSnapshot.tx_total, InformSnapshot.dropped)
+        select(
+            InformSnapshot.timestamp,
+            InformSnapshot.rx_total,
+            InformSnapshot.tx_total,
+            InformSnapshot.dropped,
+        )
         .where(
             InformSnapshot.repeater_id == repeater.id,
             InformSnapshot.timestamp >= window_start,
@@ -552,7 +571,8 @@ def _evaluate_drop_rate_policy(
     should_alert = drop_rate >= threshold
     message = (
         f"Drop rate {drop_rate * 100:.2f}% over {window_minutes}m "
-        f"(threshold {threshold * 100:.2f}%, dropped_delta={dropped_delta}, traffic_delta={traffic_delta})."
+        f"(threshold {threshold * 100:.2f}%, dropped_delta={dropped_delta}, "
+        f"traffic_delta={traffic_delta})."
     )
     return should_alert, message
 

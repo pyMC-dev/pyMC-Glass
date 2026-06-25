@@ -1,6 +1,6 @@
 {
-  "name": "pymc-glass-frontend",
-  "version": "1.0.4",
+  "name": "openhop-glass-frontend",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,16 +9,17 @@
     "preview": "vite preview --host 0.0.0.0 --port 5173"
   },
   "dependencies": {
-    "@types/leaflet": "^1.9.21",
     "leaflet": "^1.9.4",
-    "vue": "^3.5.0",
-    "vue-router": "^4.5.1"
+    "vue": "^3.5.38",
+    "vue-router": "^5.1.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.2.2",
-    "@vitejs/plugin-vue": "^6.0.0",
-    "tailwindcss": "^4.2.2",
-    "typescript": "^5.8.0",
-    "vite": "^7.0.0"
+    "@tailwindcss/postcss": "^4.3.1",
+    "@types/leaflet": "^1.9.21",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "esbuild": "^0.28.1",
+    "tailwindcss": "^4.3.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.0"
   }
 }

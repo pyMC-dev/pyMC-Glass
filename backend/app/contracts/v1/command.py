@@ -20,6 +20,8 @@ class CommandAction(str, Enum):
     export_config = "export_config"
     export_identity = "export_identity"
     run_diagnostic = "run_diagnostic"
+    transport_keys_sync = "transport_keys_sync"
+    policy_sync = "policy_sync"
 
 
 class QueueCommandRequestV1(BaseModel):
@@ -43,4 +45,3 @@ class CommandResultV1(BaseModel):
     status: str = Field(min_length=1, max_length=32)
     message: Optional[str] = Field(default=None, max_length=1024)
     completed_at: datetime
-

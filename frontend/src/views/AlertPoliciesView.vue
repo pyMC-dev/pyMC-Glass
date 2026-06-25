@@ -134,6 +134,13 @@
               <td><StatusPill :status="template.enabled ? 'enabled' : 'disabled'" /></td>
               <td>
                 <button
+                  class="btn btn-ghost btn-sm"
+                  :disabled="!canOperate || actionLoading"
+                  @click="openEditTemplateModal(template)"
+                >
+                  Edit
+                </button>
+                <button
                   class="btn btn-danger btn-sm"
                   :disabled="!canOperate || actionLoading"
                   @click="requestDeleteTemplate(template.id, template.name)"
@@ -199,7 +206,7 @@
               <td>
                 <div class="scope-cell">
                   <span class="scope-pill" :class="scopePillClass(assignment.scope_type)">{{ scopeTypeLabel(assignment.scope_type) }}</span>
-                  <span class="section-subtitle">{{ assignment.scope_name || assignment.scope_id || "Fleet-wide" }}</span>
+                  <span class="section-subtitle">{{ assignment.scope_name || assignment.scope_id || "Network-wide" }}</span>
                 </div>
               </td>
               <td>{{ assignment.priority }}</td>
@@ -257,7 +264,7 @@
             :disabled="!canOperate || actionLoading"
             @click="runEvaluation()"
           >
-            Evaluate fleet
+            Evaluate network
           </button>
         </div>
       </form>
@@ -287,7 +294,7 @@
             <td>
               <div class="scope-cell">
                 <span class="scope-pill" :class="scopePillClass(policy.source_scope_type)">{{ scopeTypeLabel(policy.source_scope_type) }}</span>
-                <span class="section-subtitle">{{ policy.source_scope_name || "Fleet-wide" }}</span>
+                <span class="section-subtitle">{{ policy.source_scope_name || "Network-wide" }}</span>
               </div>
             </td>
             <td>{{ formatEffectiveThreshold(policy) }}</td>
@@ -757,7 +764,7 @@
       <div class="glass-card modal-card">
         <header class="modal-header">
           <div>
-            <h3>Create Policy Template</h3>
+            <h3>{{ templateModalMode === "create" ? "Create Policy Template" : "Edit Policy Template" }}</h3>
             <p class="section-subtitle">Define one policy once, then assign it by scope.</p>
           </div>
           <button class="btn btn-ghost btn-sm" type="button" @click="closeCreateTemplateModal()">Close</button>
@@ -810,7 +817,7 @@
           <div class="modal-actions">
             <button class="btn btn-ghost" type="button" @click="closeCreateTemplateModal()">Cancel</button>
             <button class="btn btn-primary" :disabled="!canOperate || actionLoading">
-              {{ actionLoading ? "Saving..." : "Create template" }}
+              {{ actionLoading ? "Saving..." : templateModalMode === "create" ? "Create template" : "Save template" }}
             </button>
           </div>
         </form>
@@ -856,7 +863,7 @@
             <label class="field-label">
               Scope type
               <select v-model="assignmentForm.scope_type" class="field-select">
-                <option value="global">Global (fleet-wide)</option>
+                <option value="global">Global (network-wide)</option>
                 <option value="group">Group</option>
                 <option value="node">Single repeater</option>
               </select>
@@ -1352,6 +1359,7 @@ import {
   testAlertActionIntegration,
   updateAlertActionIntegration,
   updateAlertActionTemplate,
+  updateAlertPolicyTemplate,
   updateAlertPolicyActionBinding,
 } from "../api";
 import UiDataTable from "../components/ui/UiDataTable.vue";
@@ -1381,6 +1389,8 @@ const error = ref<string | null>(null);
 const showGroupMembersModal = ref(false);
 const showCreateGroupModal = ref(false);
 const showCreateTemplateModal = ref(false);
+const templateModalMode = ref<"create" | "edit">("create");
+const templateEditId = ref<string | null>(null);
 const showCreateAssignmentModal = ref(false);
 const assignmentWizardStep = ref(1);
 const showDeleteConfirmModal = ref(false);
@@ -1706,7 +1716,7 @@ const canSubmitAssignmentWizard = computed(() => {
 });
 const assignmentScopeSummary = computed(() => {
   if (assignmentForm.scope_type === "global") {
-    return "Fleet-wide";
+    return "Network-wide";
   }
   if (!assignmentForm.scope_id) {
     return "—";
@@ -2037,11 +2047,29 @@ function closeCreateGroupModal(): void {
 
 function openCreateTemplateModal(): void {
   resetTemplateForm();
+  templateModalMode.value = "create";
+  templateEditId.value = null;
+  showCreateTemplateModal.value = true;
+}
+
+function openEditTemplateModal(template: AlertPolicyTemplateResponse): void {
+  resetTemplateForm();
+  templateModalMode.value = "edit";
+  templateEditId.value = template.id;
+  templateForm.name = template.name;
+  templateForm.rule_type = template.rule_type;
+  templateForm.severity = template.severity;
+  templateForm.threshold_value = template.threshold_value;
+  templateForm.window_minutes = template.window_minutes;
+  templateForm.offline_grace_seconds = template.offline_grace_seconds;
+  templateForm.enabled = template.enabled;
+  templateForm.auto_resolve = template.auto_resolve;
   showCreateTemplateModal.value = true;
 }
 
 function closeCreateTemplateModal(): void {
   showCreateTemplateModal.value = false;
+  templateEditId.value = null;
 }
 
 function openCreateAssignmentModal(): void {
@@ -2299,7 +2327,7 @@ async function runIntegrationTestAction(integration: AlertActionIntegrationRespo
         integration_id: integration.id,
       },
       rendered_payload: {
-        title: "pyMC_Glass Action Test",
+        title: "openHop Glass Action Test",
         body: "Integration test send from Alert Policies Actions section.",
       },
     });
@@ -2582,9 +2610,8 @@ async function createTemplateEntry(): Promise<boolean> {
   }
   actionLoading.value = true;
   try {
-    await createAlertPolicyTemplate(appState.token, {
+    const payload = {
       name: templateForm.name.trim(),
-      rule_type: templateForm.rule_type,
       severity: templateForm.severity,
       enabled: templateForm.enabled,
       auto_resolve: templateForm.auto_resolve,
@@ -2598,7 +2625,15 @@ async function createTemplateEntry(): Promise<boolean> {
         ? templateForm.offline_grace_seconds ?? undefined
         : undefined,
       config: {},
-    });
+    };
+    if (templateModalMode.value === "edit" && templateEditId.value) {
+      await updateAlertPolicyTemplate(appState.token, templateEditId.value, payload);
+    } else {
+      await createAlertPolicyTemplate(appState.token, {
+        ...payload,
+        rule_type: templateForm.rule_type,
+      });
+    }
     resetTemplateForm();
     await loadAll();
     return true;

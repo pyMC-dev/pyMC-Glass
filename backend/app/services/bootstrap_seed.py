@@ -32,9 +32,7 @@ def seed_default_admin_if_needed(
             "BOOTSTRAP_SEED_ADMIN_PASSWORD must be set when BOOTSTRAP_SEED_ADMIN_ENABLED is true"
         )
     if len(password) < settings.auth_password_min_length:
-        raise RuntimeError(
-            "BOOTSTRAP_SEED_ADMIN_PASSWORD is shorter than AUTH_PASSWORD_MIN_LENGTH"
-        )
+        raise RuntimeError("BOOTSTRAP_SEED_ADMIN_PASSWORD is shorter than AUTH_PASSWORD_MIN_LENGTH")
 
     with session_factory() as db:
         total_users = db.scalar(select(func.count()).select_from(User)) or 0

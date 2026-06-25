@@ -213,4 +213,3 @@ def test_transport_key_group_move_prevents_cycles(client) -> None:
     )
     assert invalid_move.status_code == 422
     assert "cycle" in invalid_move.json()["detail"].lower()
-

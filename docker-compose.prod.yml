@@ -15,13 +15,14 @@ services:
       DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}@postgres:5432/pymc_glass
 
   frontend:
-    image: pymc_glass_frontend_prod:latest
+    image: openhop_glass_frontend_prod:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
     ports: !override
       - "5173:80"
-    volumes: !override []
+    volumes: !override
+      - /etc/localtime:/etc/localtime:ro
     environment: !override {}
     working_dir: /usr/share/nginx/html
     command: ["nginx", "-g", "daemon off;"]

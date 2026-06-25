@@ -47,6 +47,14 @@ import type {
   QueueCommandRequest,
   RepeaterCreateRequest,
   RepeaterDetailResponse,
+  RepeaterPolicySyncRequest,
+  RepeaterPolicySyncResponse,
+  RepeaterPolicySyncStatusResponse,
+  RepeaterPolicyTemplateCreateRequest,
+  RepeaterPolicyTemplateResponse,
+  RepeaterPolicyTemplateUpdateRequest,
+  RepeaterPolicyValidateRequest,
+  RepeaterPolicyValidateResponse,
   RepeaterResponse,
   RepeaterUpdateRequest,
   ManagedMqttSettingsResponse,
@@ -173,6 +181,70 @@ export function updateManagedMqttSettings(
     method: "PUT",
     token,
     body: payload,
+  });
+}
+
+export function listRepeaterPolicyTemplates(token: string): Promise<RepeaterPolicyTemplateResponse[]> {
+  return request<RepeaterPolicyTemplateResponse[]>("/api/repeater-policies/templates", { token });
+}
+
+export function createRepeaterPolicyTemplate(
+  token: string,
+  payload: RepeaterPolicyTemplateCreateRequest,
+): Promise<RepeaterPolicyTemplateResponse> {
+  return request<RepeaterPolicyTemplateResponse>("/api/repeater-policies/templates", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export function updateRepeaterPolicyTemplate(
+  token: string,
+  templateId: string,
+  payload: RepeaterPolicyTemplateUpdateRequest,
+): Promise<RepeaterPolicyTemplateResponse> {
+  return request<RepeaterPolicyTemplateResponse>(`/api/repeater-policies/templates/${templateId}`, {
+    method: "PATCH",
+    token,
+    body: payload,
+  });
+}
+
+export function deleteRepeaterPolicyTemplate(token: string, templateId: string): Promise<void> {
+  return request<void>(`/api/repeater-policies/templates/${templateId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export function validateRepeaterPolicy(
+  token: string,
+  payload: RepeaterPolicyValidateRequest,
+): Promise<RepeaterPolicyValidateResponse> {
+  return request<RepeaterPolicyValidateResponse>("/api/repeater-policies/validate", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export function syncRepeaterPolicy(
+  token: string,
+  payload: RepeaterPolicySyncRequest,
+): Promise<RepeaterPolicySyncResponse> {
+  return request<RepeaterPolicySyncResponse>("/api/repeater-policies/sync", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export function listRepeaterPolicySyncStatus(
+  token: string,
+): Promise<RepeaterPolicySyncStatusResponse[]> {
+  return request<RepeaterPolicySyncStatusResponse[]>("/api/repeater-policies/sync-status", {
+    token,
   });
 }
 

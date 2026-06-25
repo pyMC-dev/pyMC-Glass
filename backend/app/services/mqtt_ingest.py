@@ -296,7 +296,9 @@ class MqttIngestProcessor:
             first_seen = last_seen
 
         normalized_pubkey = pubkey.strip().lower()
-        topology_node = db.scalar(select(TopologyNode).where(TopologyNode.pubkey == normalized_pubkey))
+        topology_node = db.scalar(
+            select(TopologyNode).where(TopologyNode.pubkey == normalized_pubkey)
+        )
         if topology_node is None:
             topology_node = TopologyNode(
                 pubkey=normalized_pubkey,
@@ -322,7 +324,9 @@ class MqttIngestProcessor:
                 topology_node.latitude = latitude
                 topology_node.longitude = longitude
             topology_node.first_seen_at = _min_datetime(topology_node.first_seen_at, first_seen)
-            topology_node.last_seen_at = _max_datetime(topology_node.last_seen_at, last_seen) or last_seen
+            topology_node.last_seen_at = (
+                _max_datetime(topology_node.last_seen_at, last_seen) or last_seen
+            )
             topology_node.last_observed_by_repeater_id = repeater.id
 
         observation = db.scalar(
@@ -364,14 +368,17 @@ class MqttIngestProcessor:
             if snr is not None:
                 observation.snr = snr
             observation.first_seen_at = _min_datetime(observation.first_seen_at, first_seen)
-            observation.last_seen_at = _max_datetime(observation.last_seen_at, last_seen) or last_seen
+            observation.last_seen_at = (
+                _max_datetime(observation.last_seen_at, last_seen) or last_seen
+            )
             if advert_count is not None:
                 if observation.advert_count is None:
                     observation.advert_count = advert_count
                 else:
                     observation.advert_count = max(observation.advert_count, advert_count)
             observation.last_event_timestamp = (
-                _max_datetime(observation.last_event_timestamp, message.timestamp) or message.timestamp
+                _max_datetime(observation.last_event_timestamp, message.timestamp)
+                or message.timestamp
             )
             observation.last_ingested_at = ingested_at
         sample = db.scalar(
@@ -620,7 +627,9 @@ class MqttIngestService:
             )
         if self._settings.mqtt_tls_enabled:
             tls_kwargs: dict[str, Any] = {
-                "cert_reqs": ssl.CERT_NONE if self._settings.mqtt_tls_insecure else ssl.CERT_REQUIRED,
+                "cert_reqs": ssl.CERT_NONE
+                if self._settings.mqtt_tls_insecure
+                else ssl.CERT_REQUIRED,
                 "tls_version": ssl.PROTOCOL_TLS_CLIENT,
             }
             if self._settings.mqtt_tls_ca_cert:
@@ -640,7 +649,8 @@ class MqttIngestService:
                 )
             if bool(tls_kwargs.get("certfile")) != bool(tls_kwargs.get("keyfile")):
                 raise RuntimeError(
-                    "mqtt_tls_client_cert and mqtt_tls_client_key must both be configured when using client certificates"
+                    "mqtt_tls_client_cert and mqtt_tls_client_key must both be configured "
+                    "when using client certificates"
                 )
             client.tls_set(**tls_kwargs)
             if self._settings.mqtt_tls_insecure:

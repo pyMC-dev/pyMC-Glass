@@ -30,4 +30,3 @@ class AlertRecordV1(BaseModel):
     message: str = Field(min_length=1, max_length=1024)
     created_at: datetime
     resolved_at: Optional[datetime] = None
-

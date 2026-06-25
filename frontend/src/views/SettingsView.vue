@@ -256,6 +256,18 @@
               <input v-model.trim="managedMqttForm.mqtt_broker_host" class="field" required />
             </label>
             <label class="field-label">
+              Additional certificate hosts
+              <input
+                v-model.trim="managedMqttForm.mqtt_broker_additional_hosts"
+                class="field"
+                placeholder="e.g. 100.92.58.22, glass.example.com"
+              />
+              <span class="field-help">
+                Optional comma-separated IPs/hostnames to include in the Glass broker TLS
+                certificate. These are not pushed as the active repeater broker host.
+              </span>
+            </label>
+            <label class="field-label">
               MQTT broker port
               <input
                 v-model.number="managedMqttForm.mqtt_broker_port"
@@ -456,6 +468,7 @@ const managedSettingsUpdatedAt = ref<string | null>(null);
 const managedMqttForm = reactive({
   mqtt_enabled: true,
   mqtt_broker_host: "",
+  mqtt_broker_additional_hosts: "",
   mqtt_broker_port: 1883,
   mqtt_base_topic: "glass",
   mqtt_tls_enabled: false,
@@ -686,6 +699,7 @@ async function applySettings(): Promise<void> {
 function applyManagedSettingsToForm(settings: ManagedMqttSettingsResponse): void {
   managedMqttForm.mqtt_enabled = settings.mqtt_enabled;
   managedMqttForm.mqtt_broker_host = settings.mqtt_broker_host;
+  managedMqttForm.mqtt_broker_additional_hosts = (settings.mqtt_broker_additional_hosts || []).join(", ");
   managedMqttForm.mqtt_broker_port = settings.mqtt_broker_port;
   managedMqttForm.mqtt_base_topic = settings.mqtt_base_topic;
   managedMqttForm.mqtt_tls_enabled = settings.mqtt_tls_enabled;
@@ -711,6 +725,10 @@ async function saveManagedSettings(queueToRepeaters: boolean): Promise<void> {
     return;
   }
   const host = managedMqttForm.mqtt_broker_host.trim();
+  const additionalHosts = managedMqttForm.mqtt_broker_additional_hosts
+    .split(/[\n,]+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
   const topic = managedMqttForm.mqtt_base_topic.trim().replace(/^\/+|\/+$/g, "");
   if (!host) {
     setLocalError("MQTT broker host cannot be empty.");
@@ -731,6 +749,7 @@ async function saveManagedSettings(queueToRepeaters: boolean): Promise<void> {
   const response = await saveManagedMqttSettingsApi({
     mqtt_enabled: managedMqttForm.mqtt_enabled,
     mqtt_broker_host: host,
+    mqtt_broker_additional_hosts: additionalHosts,
     mqtt_broker_port: managedMqttForm.mqtt_broker_port,
     mqtt_base_topic: topic,
     mqtt_tls_enabled: managedMqttForm.mqtt_tls_enabled,

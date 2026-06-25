@@ -1,0 +1,1 @@
+ALTER TABLE repeaters ADD COLUMN open_url TEXT NULL;

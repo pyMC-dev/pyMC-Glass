@@ -4,4 +4,3 @@ def test_healthz(client) -> None:
     body = response.json()
     assert body["status"] == "ok"
     assert body["contract_version"] == "v1"
-

@@ -1,2 +1,1 @@
-"""Database package for pyMC_Glass."""
-
+"""Database package for openHop Glass."""

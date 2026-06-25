@@ -29,7 +29,7 @@
           <div class="flex items-start gap-3 rounded-xl border border-slate-700/60 bg-slate-900/50 p-4">
             <span class="mt-0.5 text-2xl">🛰️</span>
             <div>
-              <h3 class="font-semibold text-slate-100">Welcome to pyMC_Glass</h3>
+              <h3 class="font-semibold text-slate-100">Welcome to openHop Glass</h3>
               <p class="mt-1 text-sm text-slate-400">
                 This wizard will help you configure the core server settings so your repeaters
                 can connect. It only takes a minute.
@@ -54,7 +54,8 @@
       <template v-else-if="currentStep === 2">
         <div class="space-y-4">
           <p class="text-sm text-slate-400">
-            Enter the MQTT broker details that your repeaters will connect to.
+            Enter the MQTT broker that repeaters use to send telemetry to openHop Glass. For a
+            Glass-hosted broker, use this Glass server's reachable hostname or IP.
           </p>
           <label class="field-label">
             Broker hostname or IP
@@ -123,7 +124,7 @@
           >
             <p class="font-medium text-cyan-300">Automatic certificate management</p>
             <p class="mt-1 text-slate-400">
-              pyMC_Glass will automatically generate a local Certificate Authority, broker
+              openHop Glass will automatically generate a local Certificate Authority, broker
               certificate, and per-repeater client certificates. No manual certificate handling
               required.
             </p>
@@ -223,7 +224,7 @@ import { saveManagedMqttSettings } from "../../state/appState";
 
 const emit = defineEmits<{ complete: [] }>();
 
-const SKIP_KEY = "pymc_glass_setup_wizard_skipped";
+const SKIP_KEY = "openhop_glass_setup_wizard_skipped";
 const DEFAULT_PORT_PLAIN = 1883;
 const DEFAULT_PORT_TLS = 8883;
 

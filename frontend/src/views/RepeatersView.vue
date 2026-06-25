@@ -141,6 +141,9 @@
                 <router-link :to="`/repeaters/${repeater.id}`" class="btn btn-secondary btn-sm" @click.stop>
                   View
                 </router-link>
+                <button class="btn btn-secondary btn-sm" type="button" @click.stop="openRepeaterUi(repeater)">
+                  Open Repeater
+                </button>
                 <button
                   class="btn btn-danger btn-sm"
                   :disabled="!canOperate || appState.actionLoading"
@@ -165,7 +168,8 @@ import { computed, reactive, ref } from "vue";
 import UiDataTable from "../components/ui/UiDataTable.vue";
 
 import StatusPill from "../components/ui/StatusPill.vue";
-import { COMMAND_ACTIONS, type CommandAction } from "../types";
+import { COMMAND_ACTIONS, type CommandAction, type RepeaterResponse } from "../types";
+import { repeaterUiUrl } from "../utils/repeaterUi";
 import {
   appState,
   canOperate,
@@ -242,6 +246,10 @@ function hasInformWarning(lastInformAt: string | null): boolean {
 
 function isConnectedButSilent(status: string, lastInformAt: string | null): boolean {
   return status === "connected" && hasInformWarning(lastInformAt);
+}
+
+function openRepeaterUi(repeater: RepeaterResponse): void {
+  window.open(repeaterUiUrl(repeater), "_blank", "noopener,noreferrer");
 }
 
 async function queueBulkAction(): Promise<void> {

@@ -20,4 +20,3 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     expires_at: datetime
     user: UserInfoResponse
-

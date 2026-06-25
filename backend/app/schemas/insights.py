@@ -78,6 +78,7 @@ class TopologySummaryResponse(BaseModel):
     top_observer_node_name: str | None = None
     top_observer_count: int | None = None
 
+
 class TopologyRepeaterTrafficShareResponse(BaseModel):
     repeater_id: str
     repeater_node_name: str

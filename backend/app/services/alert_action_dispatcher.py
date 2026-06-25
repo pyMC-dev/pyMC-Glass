@@ -86,4 +86,3 @@ class AlertActionDispatcherService:
                 raise
             if processed > 0:
                 logger.debug("Alert action dispatcher processed %s queued event(s)", processed)
-

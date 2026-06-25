@@ -3,7 +3,9 @@
     <UiPanelCard class="auth-card">
       <header>
         <div class="auth-brand">
-          <img class="auth-logo" :src="logoImage" alt="pyMC_Glass logo" />
+          <img class="auth-logo" :src="logoImage" alt="openHop Glass logo" />
+          <h1 class="auth-product-title">Glass</h1>
+          <p class="auth-product-subtitle">Mesh network orchestration</p>
         </div>
       </header>
 
@@ -68,7 +70,7 @@
 import { reactive } from "vue";
 import { useRouter } from "vue-router";
 import UiPanelCard from "../components/ui/UiPanelCard.vue";
-import logoImage from "../logo.png";
+import logoImage from "../assets/logo/openhop_transparent_trim.png";
 
 import { appState, bootstrapAdminAccount, loginAccount } from "../state/appState";
 
@@ -126,6 +128,7 @@ async function handleLogin(): Promise<void> {
 
 .auth-brand {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   width: 100%;
@@ -133,9 +136,33 @@ async function handleLogin(): Promise<void> {
 
 .auth-logo {
   display: block;
-  width: min(256px, 58vw);
+  width: min(300px, 64vw);
   max-width: 100%;
   height: auto;
+  padding: 0.85rem;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 1rem;
+  background: radial-gradient(circle at 30% 20%, rgba(96, 165, 250, 0.16), transparent 42%),
+    linear-gradient(145deg, #020617, #0f172a 58%, #111827);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 18px 45px rgba(15, 23, 42, 0.16);
+}
+
+.auth-product-title {
+  margin-top: 0.2rem;
+  color: var(--color-text-primary);
+  font-size: clamp(1.35rem, 4vw, 1.8rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.auth-product-subtitle {
+  margin-top: 0.45rem;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .auth-form {

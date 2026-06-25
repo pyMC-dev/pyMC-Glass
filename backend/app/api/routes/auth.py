@@ -90,4 +90,3 @@ def logout(
         )
         db.commit()
     return {"success": True}
-

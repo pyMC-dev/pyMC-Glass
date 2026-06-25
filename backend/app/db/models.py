@@ -68,6 +68,7 @@ class Repeater(Base):
         nullable=True,
     )
     inform_ip: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    open_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     config_hash: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
     cert_serial: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     cert_expires_at: Mapped[Optional[datetime]] = mapped_column(
@@ -84,6 +85,7 @@ class Repeater(Base):
         default=_now_utc,
         onupdate=_now_utc,
     )
+
 
 class TopologyObservationSample(Base):
     __tablename__ = "topology_observation_samples"
@@ -112,6 +114,7 @@ class TopologyObservationSample(Base):
     rssi: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     snr: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc)
+
 
 class TransportKeyGroup(Base):
     __tablename__ = "transport_key_groups"
@@ -172,13 +175,64 @@ class TransportKeySyncStatus(Base):
     status: Mapped[str] = mapped_column(String(32), default="idle", index=True)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     queued_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    dispatched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    dispatched_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=_now_utc,
         onupdate=_now_utc,
     )
+
+
+class RepeaterPolicyTemplate(Base):
+    __tablename__ = "repeater_policy_templates"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    name: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    enabled: Mapped[int] = mapped_column(Integer, default=1, index=True)
+    policy_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_now_utc,
+        onupdate=_now_utc,
+    )
+
+
+class RepeaterPolicySyncStatus(Base):
+    __tablename__ = "repeater_policy_sync_status"
+
+    repeater_id: Mapped[str] = mapped_column(
+        ForeignKey("repeaters.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    template_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("repeater_policy_templates.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    command_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("command_queue.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    payload_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(32), default="idle", index=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    queued_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    dispatched_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_now_utc,
+        onupdate=_now_utc,
+    )
+
 
 class NodeGroup(Base):
     __tablename__ = "node_groups"
@@ -248,6 +302,7 @@ class Packet(Base):
     payload: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     packet_hash: Mapped[Optional[str]] = mapped_column(String(128), unique=True, nullable=True)
 
+
 class MqttIngestEvent(Base):
     __tablename__ = "mqtt_ingest_events"
 
@@ -263,6 +318,8 @@ class MqttIngestEvent(Base):
     payload_json: Mapped[str] = mapped_column(Text)
     dedup_key: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc)
+
+
 class TopologyNode(Base):
     __tablename__ = "topology_nodes"
 
@@ -273,7 +330,9 @@ class TopologyNode(Base):
     contact_type: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    first_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    first_seen_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     last_observed_by_repeater_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("repeaters.id", ondelete="SET NULL"),
@@ -314,7 +373,9 @@ class TopologyObservation(Base):
     longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     rssi: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     snr: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    first_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    first_seen_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     advert_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     last_event_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -370,6 +431,7 @@ class CommandQueueItem(Base):
     status: Mapped[str] = mapped_column(String(32), default="queued", index=True)
     result_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     requested_by: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+
 
 class ConfigSnapshot(Base):
     __tablename__ = "config_snapshots"
@@ -434,6 +496,7 @@ class Alert(Base):
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
+
 class AlertPolicyTemplate(Base):
     __tablename__ = "alert_policy_templates"
 
@@ -475,6 +538,7 @@ class AlertPolicyAssignment(Base):
         default=_now_utc,
         onupdate=_now_utc,
     )
+
 
 class AlertActionIntegration(Base):
     __tablename__ = "alert_action_integrations"

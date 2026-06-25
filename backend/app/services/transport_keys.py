@@ -28,9 +28,13 @@ class TransportKeySyncDispatchResult:
 
 def build_transport_key_sync_payload(db: Session) -> tuple[dict, str]:
     groups = db.scalars(
-        select(TransportKeyGroup).order_by(TransportKeyGroup.sort_order.asc(), TransportKeyGroup.name.asc())
+        select(TransportKeyGroup).order_by(
+            TransportKeyGroup.sort_order.asc(), TransportKeyGroup.name.asc()
+        )
     ).all()
-    keys = db.scalars(select(TransportKey).order_by(TransportKey.sort_order.asc(), TransportKey.name.asc())).all()
+    keys = db.scalars(
+        select(TransportKey).order_by(TransportKey.sort_order.asc(), TransportKey.name.asc())
+    ).all()
 
     nodes: list[dict[str, object | None]] = []
     for group in groups:
@@ -41,7 +45,9 @@ def build_transport_key_sync_payload(db: Session) -> tuple[dict, str]:
                 "name": group.name,
                 "flood_policy": group.flood_policy,
                 "transport_key": group.transport_key,
-                "parent_node_id": f"group:{group.parent_group_id}" if group.parent_group_id else None,
+                "parent_node_id": f"group:{group.parent_group_id}"
+                if group.parent_group_id
+                else None,
                 "sort_order": group.sort_order,
             }
         )
@@ -133,7 +139,9 @@ def mark_transport_key_sync_dispatched(
     repeater_id: str,
     command_id: str,
 ) -> None:
-    row = db.scalar(select(TransportKeySyncStatus).where(TransportKeySyncStatus.repeater_id == repeater_id))
+    row = db.scalar(
+        select(TransportKeySyncStatus).where(TransportKeySyncStatus.repeater_id == repeater_id)
+    )
     if row is None:
         row = TransportKeySyncStatus(repeater_id=repeater_id)
         db.add(row)
@@ -153,7 +161,9 @@ def mark_transport_key_sync_result(
     message: str | None,
     completed_at: datetime | None,
 ) -> None:
-    row = db.scalar(select(TransportKeySyncStatus).where(TransportKeySyncStatus.repeater_id == repeater_id))
+    row = db.scalar(
+        select(TransportKeySyncStatus).where(TransportKeySyncStatus.repeater_id == repeater_id)
+    )
     if row is None:
         row = TransportKeySyncStatus(repeater_id=repeater_id)
         db.add(row)
@@ -166,4 +176,3 @@ def mark_transport_key_sync_result(
     row.error_message = message if normalized_status in {"failed", "partial"} else None
     row.completed_at = completed_at or now
     row.updated_at = now
-

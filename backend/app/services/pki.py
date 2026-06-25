@@ -50,7 +50,7 @@ class PkiService:
             subject = x509.Name(
                 [
                     x509.NameAttribute(NameOID.COUNTRY_NAME, "XX"),
-                    x509.NameAttribute(NameOID.ORGANIZATION_NAME, "pyMC_Glass"),
+                    x509.NameAttribute(NameOID.ORGANIZATION_NAME, "openHop Glass"),
                     x509.NameAttribute(NameOID.COMMON_NAME, self._settings.pki_ca_common_name),
                 ]
             )
@@ -177,9 +177,7 @@ class PkiService:
     ) -> bool:
         with self._lock:
             self.ensure_ca()
-            dns_names, ip_names = self._broker_server_san_entries(
-                extra_san_hosts=extra_san_hosts
-            )
+            dns_names, ip_names = self._broker_server_san_entries(extra_san_hosts=extra_san_hosts)
             if (
                 self._mqtt_broker_key_path.exists()
                 and self._mqtt_broker_cert_path.exists()
@@ -213,7 +211,7 @@ class PkiService:
             self._issue_leaf_certificate(
                 key_path=self._mqtt_backend_key_path,
                 cert_path=self._mqtt_backend_cert_path,
-                common_name="pymc-glass-backend",
+                common_name="openhop-glass-backend",
                 ext_key_usages=[ExtendedKeyUsageOID.CLIENT_AUTH],
             )
 
@@ -286,9 +284,7 @@ class PkiService:
             san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
         except x509.ExtensionNotFound:
             return False
-        existing_dns = {
-            str(name).strip().lower() for name in san.get_values_for_type(x509.DNSName)
-        }
+        existing_dns = {str(name).strip().lower() for name in san.get_values_for_type(x509.DNSName)}
         existing_ips = {str(name) for name in san.get_values_for_type(x509.IPAddress)}
         required_dns = {str(name).strip().lower() for name in dns_names if str(name).strip()}
         required_ips = {str(name).strip() for name in ip_names if str(name).strip()}

@@ -685,6 +685,7 @@ import {
 import UiDataTable from "../components/ui/UiDataTable.vue";
 import UiPanelCard from "../components/ui/UiPanelCard.vue";
 import UiStatCard from "../components/ui/UiStatCard.vue";
+import { useTheme } from "../composables/useTheme";
 import { appState, formatTimestamp } from "../state/appState";
 import type {
   NeighborObservationListResponse,
@@ -1116,11 +1117,13 @@ const peerTableRows = computed(() =>
 
 let topologyEventSource: EventSource | null = null;
 let refreshDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+const { theme } = useTheme();
 
 let leafletMap: L.Map | null = null;
 let markerLayer: L.LayerGroup | null = null;
 let edgeLayer: L.LayerGroup | null = null;
 let heatLayer: L.LayerGroup | null = null;
+let tileLayer: L.TileLayer | null = null;
 let hasFittedBounds = false;
 
 watch(
@@ -1184,6 +1187,10 @@ watch([mapNodes, mapEdges, showHeatmap], () => {
   renderMapLayers();
 });
 
+watch(theme, () => {
+  updateTopologyTileLayer();
+});
+
 watch(selectedPubkey, () => {
   renderMapLayers();
 });
@@ -1206,6 +1213,24 @@ onBeforeUnmount(() => {
   window.removeEventListener("keydown", handleEscapeKey);
 });
 
+function topologyTileUrl(): string {
+  return theme.value === "dark"
+    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+    : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+}
+
+function updateTopologyTileLayer(): void {
+  if (!leafletMap) return;
+  if (tileLayer) {
+    tileLayer.removeFrom(leafletMap);
+    tileLayer = null;
+  }
+  tileLayer = L.tileLayer(topologyTileUrl(), {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+  }).addTo(leafletMap);
+}
+
 function initMap(): void {
   if (!mapContainer.value || leafletMap) {
     return;
@@ -1215,10 +1240,7 @@ function initMap(): void {
     attributionControl: true,
   }).setView([20, 0], 2);
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "&copy; OpenStreetMap contributors",
-  }).addTo(leafletMap);
+  updateTopologyTileLayer();
 
   edgeLayer = L.layerGroup().addTo(leafletMap);
   heatLayer = L.layerGroup().addTo(leafletMap);
@@ -1241,6 +1263,7 @@ function destroyMap(): void {
   markerLayer = null;
   edgeLayer = null;
   heatLayer = null;
+  tileLayer = null;
   hasFittedBounds = false;
 }
 

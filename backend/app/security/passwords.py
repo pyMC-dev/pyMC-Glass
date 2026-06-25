@@ -25,4 +25,3 @@ def verify_password(password: str, stored_hash: str) -> bool:
         return hmac.compare_digest(calculated, expected_digest)
     except Exception:
         return False
-

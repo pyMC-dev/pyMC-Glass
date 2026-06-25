@@ -27,4 +27,3 @@ TopicPath = Annotated[str, Field(min_length=1, max_length=256)]
 
 class TimestampedModel(BaseModel):
     timestamp: datetime = Field(description="RFC3339 UTC timestamp")
-

@@ -62,4 +62,3 @@ def apply_migrations(engine: Engine) -> None:
                 text(insert_migration),
                 {"version": version},
             )
-

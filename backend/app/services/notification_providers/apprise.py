@@ -26,7 +26,7 @@ class AppriseNotificationProvider:
         supports_send=True,
         supports_templated_payload=True,
     )
-    _USER_AGENT = "pyMC_Glass/alert-actions"
+    _USER_AGENT = "openHop Glass/alert-actions"
 
     def validate_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
         validated = AppriseIntegrationSettings.model_validate(settings)
@@ -91,7 +91,9 @@ class AppriseNotificationProvider:
     @staticmethod
     def _resolve_notify_type(*, payload: dict[str, Any], default_notify_type: str) -> str:
         candidate = payload.get("type", payload.get("notify_type", default_notify_type))
-        normalized = str(candidate).strip().lower() if candidate is not None else default_notify_type
+        normalized = (
+            str(candidate).strip().lower() if candidate is not None else default_notify_type
+        )
         if normalized in VALID_APPRISE_NOTIFY_TYPES:
             return normalized
         return default_notify_type
@@ -231,6 +233,8 @@ class AppriseNotificationProvider:
                 error=error_message or f"Apprise request failed with HTTP {exc.code}",
             )
         except urllib_error.URLError as exc:
-            return NotificationSendResult(status="failed", error=f"Apprise request failed: {exc.reason}")
+            return NotificationSendResult(
+                status="failed", error=f"Apprise request failed: {exc.reason}"
+            )
         except TimeoutError:
             return NotificationSendResult(status="failed", error="Apprise request timed out")

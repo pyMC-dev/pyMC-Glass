@@ -39,7 +39,9 @@ class WebhookNotificationProvider:
     ) -> NotificationSendResult:
         validated = WebhookIntegrationSettings.model_validate(settings)
         payload = self.build_payload(request)
-        body = json.dumps(payload, separators=(",", ":"), sort_keys=True, default=str).encode("utf-8")
+        body = json.dumps(payload, separators=(",", ":"), sort_keys=True, default=str).encode(
+            "utf-8"
+        )
         if len(body) > validated.max_body_bytes:
             return NotificationSendResult(
                 status="failed",
@@ -49,7 +51,7 @@ class WebhookNotificationProvider:
                 ),
             )
 
-        headers = {"Content-Type": "application/json", "User-Agent": "pyMC_Glass/alert-actions"}
+        headers = {"Content-Type": "application/json", "User-Agent": "openHop Glass/alert-actions"}
         headers.update(validated.headers)
         request_obj = urllib_request.Request(
             url=str(validated.url),
@@ -87,7 +89,9 @@ class WebhookNotificationProvider:
                 error=f"Webhook request failed with HTTP {exc.code}",
             )
         except urllib_error.URLError as exc:
-            return NotificationSendResult(status="failed", error=f"Webhook request failed: {exc.reason}")
+            return NotificationSendResult(
+                status="failed", error=f"Webhook request failed: {exc.reason}"
+            )
         except TimeoutError:
             return NotificationSendResult(status="failed", error="Webhook request timed out")
 

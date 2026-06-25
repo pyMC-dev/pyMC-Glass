@@ -13,6 +13,7 @@ init-env:
 init-prod-env:
 	cp -n .env.production.example .env.production || true
 	cp -n backend/.env.production.example backend/.env.production || true
+	[ -f backend/.env.production ] && cp backend/.env.production backend/.env || true
 easy-start:
 	./scripts/easy-start.sh
 

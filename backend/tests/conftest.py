@@ -37,4 +37,3 @@ def client(tmp_path, monkeypatch) -> Generator[TestClient, None, None]:
 
     get_settings.cache_clear()
     reset_db_caches()
-

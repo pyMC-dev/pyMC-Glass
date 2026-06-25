@@ -35,4 +35,3 @@ def schemas_v1() -> dict:
         "repeater_summary_dto": api_dto.RepeaterSummaryV1.model_json_schema(),
         "adoption_action_dto": api_dto.AdoptionActionV1.model_json_schema(),
     }
-

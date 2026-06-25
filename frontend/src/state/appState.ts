@@ -50,10 +50,10 @@ import type {
   ManagedMqttSettingsUpdateResponse,
 } from "../types";
 
-const TOKEN_STORAGE_KEY = "pymc_glass_token";
-const USER_STORAGE_KEY = "pymc_glass_user";
-const EXPIRES_AT_STORAGE_KEY = "pymc_glass_expires_at";
-const SETUP_WIZARD_SKIP_KEY = "pymc_glass_setup_wizard_skipped";
+const TOKEN_STORAGE_KEY = "openhop_glass_token";
+const USER_STORAGE_KEY = "openhop_glass_user";
+const EXPIRES_AT_STORAGE_KEY = "openhop_glass_expires_at";
+const SETUP_WIZARD_SKIP_KEY = "openhop_glass_setup_wizard_skipped";
 const MAX_TELEMETRY_EVENTS = 100;
 
 export const appState = reactive({
@@ -655,7 +655,8 @@ export function formatTimestamp(value: string | null): string {
   if (!value) {
     return "—";
   }
-  const date = new Date(value);
+  const normalizedValue = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value}Z`;
+  const date = new Date(normalizedValue);
   if (Number.isNaN(date.getTime())) {
     return value;
   }

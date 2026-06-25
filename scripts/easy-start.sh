@@ -8,7 +8,7 @@ run_step() {
   "$@"
 }
 
-echo "pyMC_Glass easy start"
+echo "openHop Glass easy start"
 
 run_step make -C "$ROOT_DIR" init-env
 run_step make -C "$ROOT_DIR" init-prod-env
@@ -49,6 +49,6 @@ Open:
   Backend health: http://localhost:8080/healthz
 
 Default login:
-  Email: admin@pymc.glass
+  Email: admin@openhop.glass
   Password: admin12345678
 EOF

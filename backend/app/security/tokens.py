@@ -8,4 +8,3 @@ def generate_token(nbytes: int = 48) -> str:
 
 def hash_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
-

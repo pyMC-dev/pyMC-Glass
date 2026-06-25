@@ -17,4 +17,3 @@ def healthz() -> dict:
         "contract_version": settings.contract_version,
         "timestamp": datetime.now(UTC).isoformat(),
     }
-

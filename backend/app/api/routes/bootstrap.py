@@ -69,4 +69,3 @@ def bootstrap_admin(
 
     db.commit()
     return BootstrapAdminResponse(user_id=user.id, email=user.email, role=user.role)
-

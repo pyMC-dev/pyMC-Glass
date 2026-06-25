@@ -2,6 +2,34 @@
 @config "../../tailwind.config.js";
 
 :root {
+  color-scheme: light;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #f8fafc;
+  --color-background: #eef4fb;
+  --color-background-soft: #f8fbff;
+  --color-background-mute: #e6eef8;
+  --color-text-primary: #132033;
+  --color-text-secondary: #334155;
+  --color-text-muted: #64748b;
+  --color-border: #b8c7dc;
+  --color-border-subtle: #d6e0ef;
+  --color-primary: #0d7377;
+  --color-primary-bg: #c7f1f2;
+  --color-accent-green: #047857;
+  --color-accent-green-bg: #d9fbe8;
+  --color-accent-red: #be123c;
+  --color-accent-red-bg: #ffe2e8;
+  --color-accent-amber: #a16207;
+  --color-accent-amber-bg: #fff1c7;
+  --color-glass-bg: rgba(255, 255, 255, 0.76);
+  --color-glass-border: rgba(83, 109, 143, 0.2);
+  --color-glass-shadow: 0 16px 42px rgba(70, 93, 123, 0.18);
+  --color-theme-toggle-hover: #d8e4f2;
+  --leaflet-tile-filter: none;
+}
+
+.dark {
+  color-scheme: dark;
   --color-surface: #0f1112;
   --color-surface-elevated: #171b20;
   --color-background: #09090b;
@@ -23,6 +51,8 @@
   --color-glass-bg: rgba(8, 14, 27, 0.74);
   --color-glass-border: rgba(255, 255, 255, 0.09);
   --color-glass-shadow: 0 16px 42px rgba(0, 0, 0, 0.34);
+  --color-theme-toggle-hover: rgba(255, 255, 255, 0.07);
+  --leaflet-tile-filter: none;
 }
 
 @layer base {
@@ -72,8 +102,8 @@
   }
 
   code {
-    background: rgba(255, 255, 255, 0.07);
-    color: #d8e7fd;
+    background: color-mix(in srgb, var(--color-background-mute) 85%, transparent);
+    color: var(--color-text-primary);
     padding: 0.1rem 0.35rem;
     border-radius: 0.35rem;
     font-size: 0.83em;
@@ -150,35 +180,35 @@
   }
 
   .btn-secondary {
-    background: rgba(35, 48, 67, 0.88);
+    background: color-mix(in srgb, var(--color-background-mute) 88%, transparent);
     color: var(--color-text-primary);
-    border-color: #314561;
+    border-color: var(--color-border-subtle);
   }
 
   .btn-secondary:hover:not(:disabled) {
-    background: rgba(44, 60, 84, 0.95);
-    border-color: #4a6488;
+    background: color-mix(in srgb, var(--color-background-mute) 70%, var(--color-primary-bg) 30%);
+    border-color: var(--color-border);
   }
 
   .btn-danger {
-    background: rgba(104, 42, 54, 0.9);
-    color: #ffd9df;
-    border-color: #874053;
+    background: var(--color-accent-red-bg);
+    color: var(--color-accent-red);
+    border-color: color-mix(in srgb, var(--color-accent-red) 45%, transparent);
   }
 
   .btn-danger:hover:not(:disabled) {
-    background: rgba(122, 51, 67, 0.95);
+    background: color-mix(in srgb, var(--color-accent-red-bg) 80%, var(--color-accent-red) 20%);
   }
 
   .btn-ghost {
-    background: rgba(255, 255, 255, 0.03);
+    background: color-mix(in srgb, var(--color-background-mute) 52%, transparent);
     border-color: var(--color-border-subtle);
     color: var(--color-text-secondary);
   }
 
   .btn-ghost:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.07);
-    border-color: #41516b;
+    background: var(--color-theme-toggle-hover);
+    border-color: var(--color-border);
   }
 
   .btn-sm {
@@ -190,9 +220,9 @@
   .field-textarea {
     width: 100%;
     @apply rounded-xl border px-3 py-2 text-sm;
-    border-color: #30415b;
-    background: rgba(12, 20, 34, 0.88);
-    color: #e8eef9;
+    border-color: var(--color-border-subtle);
+    background: color-mix(in srgb, var(--color-surface) 82%, var(--color-background-mute) 18%);
+    color: var(--color-text-primary);
   }
 
   .field:focus,
@@ -228,7 +258,7 @@
   .table-wrap {
     @apply overflow-x-auto rounded-xl border;
     border-color: var(--color-border-subtle);
-    background: rgba(8, 14, 26, 0.52);
+    background: color-mix(in srgb, var(--color-background-mute) 70%, transparent);
   }
 
   .table {

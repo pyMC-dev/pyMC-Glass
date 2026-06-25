@@ -21,6 +21,8 @@ def _to_repeater_response(repeater: Repeater) -> RepeaterResponse:
         firmware_version=repeater.firmware_version,
         location=repeater.location,
         config_hash=repeater.config_hash,
+        inform_ip=repeater.inform_ip,
+        open_url=repeater.open_url,
         last_inform_at=repeater.last_inform_at,
         created_at=repeater.created_at,
         updated_at=repeater.updated_at,
@@ -94,4 +96,3 @@ def reject_repeater(
         node_name=repeater.node_name,
         status=repeater.status,
     )
-

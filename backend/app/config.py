@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    app_name: str = "pyMC_Glass API"
+    app_name: str = "openHop Glass API"
     app_env: str = "development"
     app_host: str = "0.0.0.0"
     app_port: int = 8080
@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     mqtt_ingest_enabled: bool = True
     mqtt_ingest_queue_maxsize: int = 2000
     pki_state_dir: str = "/app/data/pki"
-    pki_ca_common_name: str = "pyMC_Glass Local CA"
+    pki_ca_common_name: str = "openHop Glass Local CA"
     pki_ca_valid_days: int = 3650
     pki_client_cert_valid_days: int = 90
     pki_renew_before_days: int = 30
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     auth_token_bytes: int = 48
     auth_password_min_length: int = 12
     bootstrap_seed_admin_enabled: bool = True
-    bootstrap_seed_admin_email: str = "admin@pymc.glass"
+    bootstrap_seed_admin_email: str = "admin@openhop.glass"
     bootstrap_seed_admin_password: str = "admin12345678"
     bootstrap_seed_admin_display_name: str = "Admin"
     alert_policy_monitor_enabled: bool = True
@@ -59,4 +59,3 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
-

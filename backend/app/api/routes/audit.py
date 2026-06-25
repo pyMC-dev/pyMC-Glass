@@ -31,4 +31,3 @@ def list_audit_events(
         )
         for row in rows
     ]
-
